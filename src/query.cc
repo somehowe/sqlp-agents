@@ -59,44 +59,45 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
         }
 
         const auto &features = path.features();
-        if (features.size() == 1) {
-            const auto &column = find_column(catalog, query.source_table, features[0]);
-            return {{query.source_alias, features[0]}, column.type};
-        }
-        if (features.size() != 2) {
-            throw std::invalid_argument{"Only direct columns and one reference hop are supported"};
+        if (features.empty()) {
+            throw std::invalid_argument{"A path needs a terminal column"};
         }
 
-        const auto &mapping = find_reference(catalog.references, query.source_table, features[0]);
-        const auto &source_key = find_column(catalog, mapping.source_table, mapping.source_column);
-        const auto &target_key = find_column(catalog, mapping.target_table, mapping.target_column);
-        if (source_key.type != target_key.type) {
-            throw std::invalid_argument{"Reference key types do not match: " + features[0]};
-        }
-        if (!target_key.unique) {
-            throw std::invalid_argument{"Reference target must be declared unique: " + features[0]};
-        }
-
-        std::string target_alias;
-        for (const auto &reference : joins) {
-            if (reference.feature == features[0]) {
-                target_alias = reference.join.target.alias;
-                break;
+        std::string current_table = query.source_table;
+        std::string current_alias = query.source_alias;
+        // All components except the last name references; the last names a column.
+        for (std::size_t index = 0; index + 1 < features.size(); ++index) {
+            const auto &feature = features[index];
+            const auto &mapping = find_reference(catalog.references, current_table, feature);
+            const auto &source_key = find_column(catalog, current_table, mapping.source_column);
+            const auto &target_key = find_column(catalog, mapping.target_table, mapping.target_column);
+            if (source_key.type != target_key.type) {
+                throw std::invalid_argument{"Reference key types do not match: " + feature};
             }
-        }
-        const bool new_join = target_alias.empty();
-        if (new_join) {
-            // Appending to the source alias prevents collisions with it,
-            // including SQLite's case-insensitive identifier comparisons.
-            target_alias = query.source_alias + "_ref" + std::to_string(joins.size());
-        }
+            if (!target_key.unique) {
+                throw std::invalid_argument{"Reference target must be declared unique: " + feature};
+            }
 
-        const auto resolved = resolve_path(path, query.source_table, target_alias, catalog);
-        if (new_join) {
-            joins.push_back({features[0], resolved.join});
+            std::string target_alias;
+            for (const auto &reference : joins) {
+                // The source binding distinguishes roles reached through different prefixes.
+                if (reference.join.source.alias == current_alias && reference.feature == feature) {
+                    target_alias = reference.join.target.alias;
+                    break;
+                }
+            }
+            if (target_alias.empty()) {
+                // A suffix on the root cannot collide with it, even ignoring ASCII case.
+                target_alias = query.source_alias + "_ref" + std::to_string(joins.size());
+                joins.push_back({feature, {mapping.target_table,
+                                          {current_alias, mapping.source_column},
+                                          {target_alias, mapping.target_column}}});
+            }
+            current_table = mapping.target_table;
+            current_alias = std::move(target_alias);
         }
-        const auto &column = find_column(catalog, mapping.target_table, features[1]);
-        return {resolved.column, column.type};
+        const auto &column = find_column(catalog, current_table, features.back());
+        return {{std::move(current_alias), features.back()}, column.type};
     };
 
     std::string select_sql = query.distinct ? "SELECT DISTINCT " : "SELECT ";

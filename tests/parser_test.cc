@@ -50,13 +50,16 @@ void require_compile_error(const std::string &input, const Catalog &catalog) {
 int main() {
     const Catalog catalog{
         {
-            {"AUTHOR", {{"aid", ColumnType::Integer, true}, {"name", ColumnType::String}}},
+            {"AUTHOR", {{"aid", ColumnType::Integer, true}, {"name", ColumnType::String},
+                        {"uni_id", ColumnType::Integer}}},
             {"PAPER", {{"pid", ColumnType::Integer, true}, {"title", ColumnType::String}}},
-            {"WROTE", {{"author_aid", ColumnType::Integer}, {"paper_pid", ColumnType::Integer}}}
+            {"WROTE", {{"author_aid", ColumnType::Integer}, {"paper_pid", ColumnType::Integer}}},
+            {"UNIVERSITY", {{"uid", ColumnType::Integer, true}, {"country", ColumnType::String}}}
         },
         {
             {"WROTE", "author", "author_aid", "AUTHOR", "aid"},
-            {"WROTE", "paper", "paper_pid", "PAPER", "pid"}
+            {"WROTE", "paper", "paper_pid", "PAPER", "pid"},
+            {"AUTHOR", "university", "uni_id", "UNIVERSITY", "uid"}
         }
     };
     const std::string example =
@@ -108,8 +111,12 @@ int main() {
 
         const auto long_path = parse_query("SELECT w.author.university.country FROM WROTE w;");
         require(long_path.projections[0].path.features().size() == 3,
-                "Parser imposed the compiler's temporary path-length limit");
-        require_compile_error("SELECT w.author.university.country FROM WROTE w;", catalog);
+                "Parser lost a longer path component");
+        const auto long_sql = compile_sqlp("SELECT w.author.university.country FROM WROTE w;", catalog);
+        require(long_sql.sql.find("SELECT \"w_ref1\".\"country\"") == 0 &&
+                    long_sql.sql.find("ON \"w_ref0\".\"uni_id\" = \"w_ref1\".\"uid\"") != std::string::npos,
+                "Text-to-SQL compilation lost the second reference hop");
+        require_compile_error("SELECT w.author.missing.country FROM WROTE w;", catalog);
         require_compile_error("SELECT a.missing FROM AUTHOR a;", catalog);
         require_compile_error("SELECT w.name FROM AUTHOR a;", catalog);
         require_compile_error("SELECT a.name FROM AUTHOR a WHERE a.aid = 'wrong type';", catalog);

@@ -10,9 +10,13 @@ Build from the repository root with `make`. Requirements: GNU Make 4.3+, Bison 3
 ./build/sqlpc \
   --column AUTHOR aid integer unique \
   --column AUTHOR name string nonunique \
+  --column AUTHOR uni_id integer nonunique \
+  --column UNIVERSITY uid integer unique \
+  --column UNIVERSITY country string nonunique \
   --column WROTE author_aid integer nonunique \
-  --reference WROTE author author_aid AUTHOR aid <<'SQLP'
-SELECT w.author.name FROM WROTE w WHERE w.author.name = 'Alice';
+  --reference WROTE author author_aid AUTHOR aid \
+  --reference AUTHOR university uni_id UNIVERSITY uid <<'SQLP'
+SELECT w.author.name FROM WROTE w WHERE w.author.university.country = 'CA';
 SQLP
 ```
 
@@ -25,7 +29,7 @@ This is a provisional version-1 interface to review with Iris. She can keep a JS
 Except for `--help` supplied alone, stdout contains one UTF-8 JSON object followed by a newline. A successful response has this shape:
 
 ```json
-{"version":1,"ok":true,"sql":"SELECT ... WHERE ... = ?;","parameters":[{"type":"string","value":"Alice"}]}
+{"version":1,"ok":true,"sql":"SELECT ... WHERE ... = ?;","parameters":[{"type":"string","value":"CA"}]}
 ```
 
 The `sql` field contains the complete generated SQL. Parameters are ordered to match its `?` placeholders. **Both parameter types encode their values as JSON strings.** For example, `{"type":"int64","value":"9223372036854775807"}` preserves an integer that JavaScript numbers cannot represent exactly. Convert `int64` values to Python integers before binding; leave `string` values unchanged.
@@ -83,6 +87,10 @@ Save compiler diagnostics separately from SQLite execution errors and answer sco
 
 ## Current limits
 
-One FROM alias, projections with optional `AS`, optional `DISTINCT`, and one literal equality filter. Paths can compile direct columns or one reference hop. The FROM alias and final semicolon are required. AND, multi-hop compilation, and path-to-join traces are still to come.
+One FROM alias, projections with optional `AS`, optional `DISTINCT`, and one literal equality filter. Paths support direct columns and finite chains of named references. Each component before the final column is a reference role. For example, `w.author.university.country` expands into two joins.
+
+Shared prefixes reuse joins across projections and the filter. Different roles and repeated visits to the same table get separate aliases; finite paths such as `a.mentor.mentor.name` are supported. Every hop checks key types and the target's uniqueness declaration.
+
+The FROM alias and final semicolon are required. AND and path-to-join traces are still to come. The CLI flags and JSON protocol are unchanged.
 
 [Project idea](IDEA.md) · [Agent context](AGENTS.md)

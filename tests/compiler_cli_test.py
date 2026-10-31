@@ -21,6 +21,46 @@ CATALOG = [
     "--reference", "WROTE", "paper", "paper_pid", "PAPER", "pid",
 ]
 
+MULTIHOP_CATALOG = CATALOG + [
+    "--column", "AUTHOR", "uni_id", "integer", "nonunique",
+    "--column", "AUTHOR", "mentor_aid", "integer", "nonunique",
+    "--column", "PAPER", "publisher_uid", "integer", "nonunique",
+    "--column", "UNIVERSITY", "uid", "integer", "unique",
+    "--column", "UNIVERSITY", "name", "string", "nonunique",
+    "--column", "UNIVERSITY", "country", "string", "nonunique",
+    "--reference", "AUTHOR", "university", "uni_id", "UNIVERSITY", "uid",
+    "--reference", "AUTHOR", "mentor", "mentor_aid", "AUTHOR", "aid",
+    "--reference", "PAPER", "publisher", "publisher_uid", "UNIVERSITY", "uid",
+]
+
+
+def multihop_fixture():
+    database = sqlite3.connect(":memory:")
+    database.executescript("""
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE UNIVERSITY(uid INTEGER PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL);
+        CREATE TABLE AUTHOR(
+            aid INTEGER PRIMARY KEY, name TEXT NOT NULL,
+            uni_id INTEGER NOT NULL REFERENCES UNIVERSITY(uid),
+            mentor_aid INTEGER NOT NULL REFERENCES AUTHOR(aid) DEFERRABLE INITIALLY DEFERRED
+        );
+        CREATE TABLE PAPER(
+            pid INTEGER PRIMARY KEY, title TEXT NOT NULL,
+            publisher_uid INTEGER NOT NULL REFERENCES UNIVERSITY(uid)
+        );
+        CREATE TABLE WROTE(
+            author_aid INTEGER NOT NULL REFERENCES AUTHOR(aid),
+            paper_pid INTEGER NOT NULL REFERENCES PAPER(pid)
+        );
+        BEGIN;
+        INSERT INTO UNIVERSITY VALUES (1, 'Waterloo', 'CA'), (2, 'Aarhus', 'DK');
+        INSERT INTO AUTHOR VALUES (1, 'Alice', 1, 2), (2, 'Bob', 2, 1), (3, 'Caro', 1, 2);
+        INSERT INTO PAPER VALUES (10, 'Databases', 2), (11, 'Graphs', 1);
+        INSERT INTO WROTE VALUES (1, 10), (1, 10), (2, 10), (3, 11), (2, 11);
+        COMMIT;
+    """)
+    return database
+
 
 def identifier(value):
     return '"' + value.replace('"', '""') + '"'
@@ -81,6 +121,50 @@ class CompilerCliTests(unittest.TestCase):
                 record = self.invoke(f"SELECT a.name FROM AUTHOR a WHERE a.aid = {number};")
                 self.assertEqual(record["parameters"], [{"type": "int64", "value": str(number)}])
                 self.assertEqual(database.execute(record["sql"], self.parameters(record)).fetchall(), [(str(number),)])
+
+    def test_multihop_filter_preserves_duplicates_and_distinct(self):
+        with multihop_fixture() as database:
+            for distinct, expected in [("", [("Alice",), ("Alice",), ("Caro",)]),
+                                       ("DISTINCT ", [("Alice",), ("Caro",)])]:
+                with self.subTest(distinct=distinct):
+                    record = self.invoke(
+                        f"SELECT {distinct}w.author.name FROM WROTE w "
+                        "WHERE w.author.university.country = 'CA';", MULTIHOP_CATALOG)
+                    rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+                    self.assertCountEqual(rows, expected)
+                    self.assertEqual(record["sql"].count("JOIN "), 2)
+
+    def test_multihop_roles_and_shared_prefixes(self):
+        record = self.invoke(
+            "SELECT w.author.name, w.author.university.name, w.paper.publisher.name "
+            "FROM WROTE w WHERE w.paper.publisher.country = 'DK';", MULTIHOP_CATALOG)
+        with multihop_fixture() as database:
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+        self.assertCountEqual(rows, [("Alice", "Waterloo", "Aarhus"),
+                                     ("Alice", "Waterloo", "Aarhus"),
+                                     ("Bob", "Aarhus", "Aarhus")])
+        # Author and publisher reach the same table through different prefixes.
+        # The WHERE path should reuse the publisher joins already selected.
+        self.assertEqual(record["sql"].count("JOIN "), 4)
+
+    def test_finite_self_reference_cycle_uses_distinct_bindings(self):
+        record = self.invoke(
+            "SELECT a.name, a.mentor.name, a.mentor.mentor.name, a.mentor.university.country "
+            "FROM AUTHOR a WHERE a.mentor.mentor.aid = 1;", MULTIHOP_CATALOG)
+        with multihop_fixture() as database:
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+        self.assertCountEqual(rows, [("Alice", "Bob", "Alice", "DK"),
+                                     ("Caro", "Bob", "Alice", "DK")])
+        self.assertEqual(record["sql"].count("JOIN "), 3)
+
+    def test_deep_path_semantic_errors(self):
+        for query in [
+            "SELECT w.author.name FROM WROTE w WHERE w.author.university.uid = 'one';",
+            "SELECT w.author.university.missing FROM WROTE w;",
+            "SELECT w.author.missing.country FROM WROTE w;",
+        ]:
+            with self.subTest(query=query):
+                self.invoke(query, MULTIHOP_CATALOG, code=1, stage="compiler")
 
     def test_quoted_names_unicode_and_control_characters_round_trip(self):
         table, column, alias = 'table" café', 'field\t\n"', 'from'

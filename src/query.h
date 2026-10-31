@@ -37,8 +37,8 @@ struct CompiledQuery {
     std::vector<SqlValue> parameters;
 };
 
-// Supports direct columns and one reference hop. Literal values are bound
-// separately; invalid names, unsupported paths, and type errors throw
+// Supports direct columns and finite multi-hop reference paths. Literal values
+// are bound separately; invalid names, reference metadata, and type errors throw
 // std::invalid_argument. Catalog declarations do not validate actual rows.
 CompiledQuery compile_query(const Query &query, const Catalog &catalog);
 

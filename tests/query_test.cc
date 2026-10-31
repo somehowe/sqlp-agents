@@ -35,16 +35,20 @@ std::size_t join_count(const std::string &sql) {
 int main() {
     const Catalog catalog{
         {
-            {"AUTHOR", {{"aid", ColumnType::Integer, true}, {"name", ColumnType::String}}},
+            {"AUTHOR", {{"aid", ColumnType::Integer, true}, {"name", ColumnType::String},
+                        {"uni_id", ColumnType::Integer}, {"mentor_aid", ColumnType::Integer}}},
             {"PAPER", {{"pid", ColumnType::Integer, true}, {"title", ColumnType::String},
                        {"lead_aid", ColumnType::Integer}, {"editor_aid", ColumnType::Integer}}},
-            {"WROTE", {{"author_aid", ColumnType::Integer}, {"paper_pid", ColumnType::Integer}}}
+            {"WROTE", {{"author_aid", ColumnType::Integer}, {"paper_pid", ColumnType::Integer}}},
+            {"UNIVERSITY", {{"uid", ColumnType::Integer, true}, {"country", ColumnType::String}}}
         },
         {
             {"WROTE", "author", "author_aid", "AUTHOR", "aid"},
             {"WROTE", "paper", "paper_pid", "PAPER", "pid"},
             {"PAPER", "lead_author", "lead_aid", "AUTHOR", "aid"},
-            {"PAPER", "editor", "editor_aid", "AUTHOR", "aid"}
+            {"PAPER", "editor", "editor_aid", "AUTHOR", "aid"},
+            {"AUTHOR", "university", "uni_id", "UNIVERSITY", "uid"},
+            {"AUTHOR", "mentor", "mentor_aid", "AUTHOR", "aid"}
         }
     };
     const Query example{
@@ -97,6 +101,50 @@ int main() {
                     role_result.sql.find("\"p_ref1\".\"name\" AS \"editor\"") != std::string::npos,
                 "Reference roles did not use distinct aliases");
 
+        const Query multi_hop{
+            "WROTE", "w", {{Path{"w", {"author", "name"}}, std::nullopt},
+                           {Path{"w", {"author", "university", "country"}}, std::nullopt}},
+            EqualityPredicate{Path{"w", {"author", "university", "country"}}, std::string{"CA"}}
+        };
+        const auto multi_result = compile_query(multi_hop, catalog);
+        require(multi_result.sql ==
+                    "SELECT \"w_ref0\".\"name\", \"w_ref1\".\"country\"\n"
+                    "FROM \"WROTE\" AS \"w\"\n"
+                    "JOIN \"AUTHOR\" AS \"w_ref0\" ON \"w\".\"author_aid\" = \"w_ref0\".\"aid\"\n"
+                    "JOIN \"UNIVERSITY\" AS \"w_ref1\" ON \"w_ref0\".\"uni_id\" = \"w_ref1\".\"uid\"\n"
+                    "WHERE \"w_ref1\".\"country\" = ?;",
+                "Multi-hop paths did not reuse their prefixes or chain the correct join sources");
+        require(multi_result.parameters == std::vector<SqlValue>{std::string{"CA"}},
+                "Deep predicate parameter lost its value or type");
+
+        const Query branches{
+            "PAPER", "p", {{Path{"p", {"lead_author", "university", "country"}}, "lead_country"},
+                           {Path{"p", {"editor", "university", "country"}}, "editor_country"}}, std::nullopt
+        };
+        const auto branch_result = compile_query(branches, catalog);
+        require(join_count(branch_result.sql) == 4 &&
+                    branch_result.sql.find("ON \"p_ref0\".\"uni_id\" = \"p_ref1\".\"uid\"") != std::string::npos &&
+                    branch_result.sql.find("ON \"p_ref2\".\"uni_id\" = \"p_ref3\".\"uid\"") != std::string::npos,
+                "The same downstream role was merged across different source bindings");
+
+        const Query revisits{
+            "AUTHOR", "a", {{Path{"a", {"mentor", "name"}}, std::nullopt},
+                            {Path{"a", {"mentor", "mentor", "name"}}, std::nullopt}},
+            EqualityPredicate{Path{"a", {"mentor", "mentor", "aid"}}, std::int64_t{1}}
+        };
+        const auto revisit_result = compile_query(revisits, catalog);
+        require(join_count(revisit_result.sql) == 2 &&
+                    revisit_result.sql.find("ON \"a_ref0\".\"mentor_aid\" = \"a_ref1\".\"aid\"") != std::string::npos,
+                "Finite paths revisiting the same table did not get distinct bindings");
+
+        Catalog dotted_role = catalog;
+        dotted_role.tables[2].columns.push_back({"uni_uid", ColumnType::Integer});
+        dotted_role.references.push_back({"WROTE", "author.university", "uni_uid", "UNIVERSITY", "uid"});
+        Query dotted_paths = multi_hop;
+        dotted_paths.projections.push_back({Path{"w", {"author.university", "country"}}, std::nullopt});
+        require(join_count(compile_query(dotted_paths, dotted_role).sql) == 3,
+                "A quoted role containing a dot collided with a multi-component prefix");
+
         Query collision{
             "WROTE", "W_REF0", {{Path{"W_REF0", {"author", "name"}}, std::nullopt}}, std::nullopt
         };
@@ -136,8 +184,10 @@ int main() {
         require_invalid(invalid, catalog, "Unknown column was accepted");
         invalid.projections[0].path = Path{"w", {"missing", "name"}};
         require_invalid(invalid, catalog, "Unknown reference was accepted");
-        invalid.projections[0].path = Path{"w", {"paper", "editor", "name"}};
-        require_invalid(invalid, catalog, "Unsupported longer path was accepted");
+        invalid.projections[0].path = Path{"w", {"paper", "editor", "missing"}};
+        require_invalid(invalid, catalog, "Unknown deep terminal column was accepted");
+        invalid.projections[0].path = Path{"w", {"paper", "missing", "name"}};
+        require_invalid(invalid, catalog, "Unknown intermediate reference was accepted");
         invalid = example;
         invalid.where->value = std::int64_t{42};
         require_invalid(invalid, catalog, "Wrong predicate literal type was accepted");
@@ -157,6 +207,22 @@ int main() {
         invalid_catalog = catalog;
         invalid_catalog.tables[2].columns[0].type = ColumnType::String;
         require_invalid(example, invalid_catalog, "Mismatched reference key types were accepted");
+
+        invalid_catalog = catalog;
+        invalid_catalog.tables[3].columns[0].unique = false;
+        require_invalid(multi_hop, invalid_catalog, "Non-unique target at a later hop was accepted");
+        invalid_catalog = catalog;
+        invalid_catalog.tables[0].columns[2].type = ColumnType::String;
+        require_invalid(multi_hop, invalid_catalog, "Mismatched key types at a later hop were accepted");
+        invalid_catalog = catalog;
+        invalid_catalog.references[4].source_column = "missing";
+        require_invalid(multi_hop, invalid_catalog, "Missing source key at a later hop was accepted");
+        invalid_catalog = catalog;
+        invalid_catalog.references[4].target_column = "missing";
+        require_invalid(multi_hop, invalid_catalog, "Missing target key at a later hop was accepted");
+        invalid = multi_hop;
+        invalid.where->value = std::int64_t{42};
+        require_invalid(invalid, catalog, "Wrong literal type for a deep terminal column was accepted");
 
         std::cout << "query compiler checks passed\n";
     } catch (const std::exception &error) {

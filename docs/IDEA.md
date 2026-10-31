@@ -26,7 +26,7 @@ JOIN UNIVERSITY AS u ON a.uni_id = u.uid
 WHERE u.country = ?;
 ```
 
-In the SQL condition, the model writes the joins itself using the same relationship facts. In the SQLP condition, it chooses the path and our compiler constructs the joins. **SQLite executes both.** This example shows the multi-hop behavior we still need to build.
+In the SQL condition, the model writes the joins itself using the same relationship facts. In the SQLP condition, it chooses the path and our compiler constructs the joins. **SQLite executes both.** The compiler now supports this multi-hop behavior.
 
 The model still has to choose the right relationship. Following a paper's publisher country instead of its author's university country could produce a valid query with the wrong answer. I think choosing the right relationship role, especially as paths get longer, is an interesting part to test.
 
@@ -66,7 +66,7 @@ SQLP's human study motivates the question. NatSQL already simplifies queries gen
 
 ## Scope for this submission
 
-The current C++ code has path/catalog helpers, one-hop resolution, and SQL rendering from constructed objects. We still need the text parser, complete-query compiler, multi-hop support, runner, and website.
+The C++ compiler now parses SQLP text, compiles multi-hop paths into SQL and parameters, and has a callable [command-line interface](COMPILER_CLI.md). We still need AND predicates, path inspection records, the agent runner, and the website.
 
 We can start with a small collection of related tables in SQLite. A data-lake sample could provide useful questions, but the dataset is still to be chosen. **For now, we supply approved relationships to both agents.** Automatic discovery through something like SemDisc is a possible later extension.
 
