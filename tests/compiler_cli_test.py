@@ -166,6 +166,75 @@ class CompilerCliTests(unittest.TestCase):
             with self.subTest(query=query):
                 self.invoke(query, MULTIHOP_CATALOG, code=1, stage="compiler")
 
+    def test_and_filters_across_roles_preserve_duplicates_and_distinct(self):
+        with multihop_fixture() as database:
+            for distinct, expected in [("", [("Alice",), ("Alice",)]),
+                                       ("DISTINCT ", [("Alice",)])]:
+                with self.subTest(distinct=distinct):
+                    record = self.invoke(
+                        f"SELECT {distinct}w.author.name FROM WROTE w "
+                        "WHERE w.author.university.country = 'CA' "
+                        "AND w.paper.publisher.country = 'DK';", MULTIHOP_CATALOG)
+                    rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+                    self.assertCountEqual(rows, expected)
+                    self.assertEqual(record["parameters"], [
+                        {"type": "string", "value": "CA"},
+                        {"type": "string", "value": "DK"},
+                    ])
+                    self.assertEqual(record["sql"].count("JOIN "), 4)
+
+    def test_and_parameter_order_types_and_shared_joins(self):
+        record = self.invoke(
+            "SELECT w.author.name, w.author.university.name FROM WROTE w "
+            "WHERE w.paper.pid = 10 and w.author.university.country = 'CA' "
+            "AND w.author.aid = 1 AND w.paper.title = 'Databases';", MULTIHOP_CATALOG)
+        self.assertEqual(record["parameters"], [
+            {"type": "int64", "value": "10"},
+            {"type": "string", "value": "CA"},
+            {"type": "int64", "value": "1"},
+            {"type": "string", "value": "Databases"},
+        ])
+        with multihop_fixture() as database:
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+        self.assertCountEqual(rows, [("Alice", "Waterloo"), ("Alice", "Waterloo")])
+        self.assertEqual(record["sql"].count("JOIN "), 3)
+
+    def test_repeated_contradictory_and_literal_and_conditions(self):
+        with multihop_fixture() as database:
+            for second, expected in [(1, [("Alice",), ("Alice",)]), (2, [])]:
+                with self.subTest(second=second):
+                    record = self.invoke(
+                        "SELECT w.author.name FROM WROTE w WHERE w.author.aid = 1 "
+                        f"AND w.author.aid = {second} AND w.author.name = 'Alice';",
+                        MULTIHOP_CATALOG)
+                    rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+                    self.assertCountEqual(rows, expected)
+                    self.assertEqual(self.parameters(record), [1, second, "Alice"])
+
+            database.execute("UPDATE AUTHOR SET name = 'AND' WHERE aid = 1")
+            record = self.invoke("SELECT a.name FROM AUTHOR a WHERE a.aid = 1 AND a.name = 'AND';")
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+            self.assertEqual(rows, [("AND",)])
+            self.assertEqual(self.parameters(record), [1, "AND"])
+
+    def test_invalid_later_and_condition_is_rejected(self):
+        for condition in ["w.author.university.uid = 'one'",
+                          "w.author.university.missing = 'CA'",
+                          "other.aid = 1"]:
+            with self.subTest(condition=condition):
+                self.invoke("SELECT w.author.name FROM WROTE w WHERE w.author.aid = 1 "
+                            f"AND {condition};", MULTIHOP_CATALOG, code=1, stage="compiler")
+
+    def test_malformed_and_and_unsupported_boolean_syntax(self):
+        for predicate in ["a.aid = 1 AND", "AND a.aid = 1",
+                          "a.aid = 1 AND AND a.name = 'Alice'",
+                          "a.aid = 1 OR a.name = 'Alice'"]:
+            with self.subTest(predicate=predicate):
+                self.invoke(f"SELECT a.name FROM AUTHOR a WHERE {predicate};",
+                            code=1, stage="parser")
+        self.invoke("SELECT a.name FROM AUTHOR a WHERE (a.aid = 1) AND a.name = 'Alice';",
+                    code=1, stage="lexer")
+
     def test_quoted_names_unicode_and_control_characters_round_trip(self):
         table, column, alias = 'table" café', 'field\t\n"', 'from'
         value = 'O\'Brien "\\\t\n\x01 café 🧠'

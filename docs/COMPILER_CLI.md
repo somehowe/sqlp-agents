@@ -16,7 +16,8 @@ Build from the repository root with `make`. Requirements: GNU Make 4.3+, Bison 3
   --column WROTE author_aid integer nonunique \
   --reference WROTE author author_aid AUTHOR aid \
   --reference AUTHOR university uni_id UNIVERSITY uid <<'SQLP'
-SELECT w.author.name FROM WROTE w WHERE w.author.university.country = 'CA';
+SELECT w.author.name FROM WROTE w
+WHERE w.author.university.country = 'CA' AND w.author.aid = 1;
 SQLP
 ```
 
@@ -29,10 +30,10 @@ This is a provisional version-1 interface to review with Iris. She can keep a JS
 Except for `--help` supplied alone, stdout contains one UTF-8 JSON object followed by a newline. A successful response has this shape:
 
 ```json
-{"version":1,"ok":true,"sql":"SELECT ... WHERE ... = ?;","parameters":[{"type":"string","value":"CA"}]}
+{"version":1,"ok":true,"sql":"SELECT ... WHERE ... = ? AND ... = ?;","parameters":[{"type":"string","value":"CA"},{"type":"int64","value":"1"}]}
 ```
 
-The `sql` field contains the complete generated SQL. Parameters are ordered to match its `?` placeholders. **Both parameter types encode their values as JSON strings.** For example, `{"type":"int64","value":"9223372036854775807"}` preserves an integer that JavaScript numbers cannot represent exactly. Convert `int64` values to Python integers before binding; leave `string` values unchanged.
+The `sql` field contains the complete generated SQL. Parameters follow the conditions' source order and match the generated `?` placeholders. Repeated conditions retain separate parameters. **Both parameter types encode their values as JSON strings.** For example, `{"type":"int64","value":"9223372036854775807"}` preserves an integer that JavaScript numbers cannot represent exactly. Convert `int64` values to Python integers before binding; leave `string` values unchanged.
 
 Failures have this shape:
 
@@ -87,10 +88,10 @@ Save compiler diagnostics separately from SQLite execution errors and answer sco
 
 ## Current limits
 
-One FROM alias, projections with optional `AS`, optional `DISTINCT`, and one literal equality filter. Paths support direct columns and finite chains of named references. Each component before the final column is a reference role. For example, `w.author.university.country` expands into two joins.
+One FROM alias, projections with optional `AS`, optional `DISTINCT`, and an optional WHERE clause containing literal equalities joined by AND. AND is case-insensitive. Paths support direct columns and finite chains of named references. Each component before the final column is a reference role. For example, `w.author.university.country` expands into two joins.
 
-Shared prefixes reuse joins across projections and the filter. Different roles and repeated visits to the same table get separate aliases; finite paths such as `a.mentor.mentor.name` are supported. Every hop checks key types and the target's uniqueness declaration.
+Shared prefixes reuse joins across projections and all conditions. Different roles and repeated visits to the same table get separate aliases; finite paths such as `a.mentor.mentor.name` are supported. Every hop checks key types and the target's uniqueness declaration. Every condition is validated, including later terms after a contradictory pair.
 
-The FROM alias and final semicolon are required. AND and path-to-join traces are still to come. The CLI flags and JSON protocol are unchanged.
+The FROM alias and final semicolon are required. OR, NOT, parentheses, and comparisons beyond literal equality are unsupported. Path-to-join traces are still to come. The CLI flags and JSON protocol are unchanged.
 
 [Project idea](IDEA.md) · [Agent context](AGENTS.md)

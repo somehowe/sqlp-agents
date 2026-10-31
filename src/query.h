@@ -22,13 +22,13 @@ struct EqualityPredicate {
     SqlValue value;
 };
 
-// The first query subset: one FROM binding and an optional equality filter.
+// One FROM binding and a conjunction of literal equalities.
 // Both the text parser and C++ callers construct these objects.
 struct Query {
     std::string source_table;
     std::string source_alias;
     std::vector<Projection> projections;
-    std::optional<EqualityPredicate> where;
+    std::vector<EqualityPredicate> where; // Empty means no WHERE clause.
     bool distinct = false;
 };
 

@@ -115,13 +115,14 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
 
     CompiledQuery result;
     std::string where_sql;
-    if (query.where) {
-        const auto bound = bind_path(query.where->path);
-        if (!matches_type(query.where->value, bound.type)) {
+    for (const auto &predicate : query.where) {
+        const auto bound = bind_path(predicate.path);
+        if (!matches_type(predicate.value, bound.type)) {
             throw std::invalid_argument{"Predicate literal type does not match the column type"};
         }
-        where_sql = "\nWHERE " + render_column(quoted_column(bound.column)) + " = ?";
-        result.parameters.push_back(query.where->value);
+        where_sql += where_sql.empty() ? "\nWHERE " : " AND ";
+        where_sql += render_column(quoted_column(bound.column)) + " = ?";
+        result.parameters.push_back(predicate.value);
     }
 
     result.sql = select_sql + "\nFROM " + source_table + " AS " + source_alias;

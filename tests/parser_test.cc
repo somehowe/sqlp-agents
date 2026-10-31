@@ -74,13 +74,13 @@ int main() {
                     parsed.projections[0].path.root() == "w" &&
                     parsed.projections[0].path.features() == std::vector<std::string>{"author", "name"} &&
                     parsed.projections[0].alias == "author_name", "Projection AST was incorrect");
-        require(parsed.where && parsed.where->path.root() == "w" &&
-                    parsed.where->path.features() == std::vector<std::string>{"paper", "title"} &&
-                    parsed.where->value == SqlValue{std::string{"Databases"}}, "Predicate AST was incorrect");
+        require(parsed.where.size() == 1 && parsed.where[0].path.root() == "w" &&
+                    parsed.where[0].path.features() == std::vector<std::string>{"paper", "title"} &&
+                    parsed.where[0].value == SqlValue{std::string{"Databases"}}, "Predicate AST was incorrect");
 
         const Query manual{
             "WROTE", "w", {{Path{"w", {"author", "name"}}, "author_name"}},
-            EqualityPredicate{Path{"w", {"paper", "title"}}, std::string{"Databases"}}, true
+            {EqualityPredicate{Path{"w", {"paper", "title"}}, std::string{"Databases"}}}, true
         };
         const auto from_text = compile_sqlp(example, catalog);
         const auto from_objects = compile_query(manual, catalog);
@@ -88,11 +88,31 @@ int main() {
                 "Text and object compilation disagreed");
 
         const auto simple = parse_query("select a.name, a.aid AS id from AUTHOR a; -- finished\n");
-        require(!simple.distinct && !simple.where && simple.projections.size() == 2 &&
+        require(!simple.distinct && simple.where.empty() && simple.projections.size() == 2 &&
                     !simple.projections[0].alias && simple.projections[1].alias == "id",
                 "Optional fields or multiple projections were incorrect");
         const auto escaped = parse_query("SELECT a.name FROM AUTHOR a WHERE a.name = 'O''Brien';");
-        require(escaped.where->value == SqlValue{std::string{"O'Brien"}}, "String escaping was lost");
+        require(escaped.where[0].value == SqlValue{std::string{"O'Brien"}}, "String escaping was lost");
+
+        const std::string and_query =
+            "SELECT a.name FROM AUTHOR a WHERE a.aid = 1 and a.name = 'AND' AND a.aid = 2;";
+        const auto conjunction = parse_query(and_query);
+        require(conjunction.where.size() == 3 &&
+                    conjunction.where[0].path.features() == std::vector<std::string>{"aid"} &&
+                    conjunction.where[0].value == SqlValue{std::int64_t{1}} &&
+                    conjunction.where[1].path.features() == std::vector<std::string>{"name"} &&
+                    conjunction.where[1].value == SqlValue{std::string{"AND"}} &&
+                    conjunction.where[2].value == SqlValue{std::int64_t{2}},
+                "Conjunction AST lost condition order, literal contents, or value types");
+        require(compile_sqlp(and_query, catalog).parameters ==
+                    std::vector<SqlValue>{std::int64_t{1}, std::string{"AND"}, std::int64_t{2}},
+                "Text-to-SQL conjunction lost parameter order");
+
+        const auto keyword_name = parse_query(
+            "SELECT a.\"AND\" FROM AUTHOR a WHERE a.\"AND\" = 'AND' AND a.aid = 1;");
+        require(keyword_name.where.size() == 2 &&
+                    keyword_name.where[0].path.features() == std::vector<std::string>{"AND"},
+                "A quoted keyword was treated as a conjunction");
 
         const auto minimum = compile_sqlp(
             "SELECT a.name FROM AUTHOR a WHERE a.aid = -9223372036854775808;", catalog);
@@ -129,7 +149,11 @@ int main() {
                  "SELECT a.name AUTHOR a;", "SELECT a. FROM AUTHOR a;",
                  "SELECT a.name, FROM AUTHOR a;", "SELECT a.name label FROM AUTHOR a;",
                  "SELECT a.name FROM AUTHOR;", "SELECT FROM AUTHOR a;",
-                 "SELECT a.name FROM AUTHOR a;;", "FROM AUTHOR a;"}) {
+                 "SELECT a.name FROM AUTHOR a;;", "FROM AUTHOR a;",
+                 "SELECT a.name FROM AUTHOR a WHERE;",
+                 "SELECT a.name FROM AUTHOR a WHERE AND a.aid = 1;",
+                 "SELECT a.name FROM AUTHOR a WHERE a.aid = 1 AND AND a.name = 'Alice';",
+                 "SELECT a.name FROM AUTHOR a WHERE a.aid = 1 AND a.name =;"}) {
             bool rejected = false;
             try { parse_query(invalid); }
             catch (const ParseError &) { rejected = true; }
@@ -141,9 +165,11 @@ int main() {
         const std::string extra = "SELECT a.name FROM AUTHOR a; extra";
         const auto extra_start = extra.find("extra");
         require_parse_error(extra, {extra_start, 1, extra_start + 1});
-        const std::string and_query = "SELECT a.name FROM AUTHOR a WHERE a.aid = 1 AND a.name = 'Alice';";
-        const auto and_start = and_query.find("AND");
-        require_parse_error(and_query, {and_start, 1, and_start + 1});
+        const std::string trailing_and = "SELECT a.name FROM AUTHOR a WHERE a.aid = 1 AND ;";
+        require_parse_error(trailing_and, {trailing_and.find(';'), 1, trailing_and.find(';') + 1});
+        const std::string or_query = "SELECT a.name FROM AUTHOR a WHERE a.aid = 1 OR a.name = 'Alice';";
+        const auto or_start = or_query.find(" OR ") + 1;
+        require_parse_error(or_query, {or_start, 1, or_start + 1});
         const std::string multiline = "SELECT a.name\r\nFROM AUTHOR a\r\nWHERE a.aid = ;";
         require_parse_error(multiline, {multiline.find(';'), 3, 15});
 

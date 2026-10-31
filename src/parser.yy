@@ -47,14 +47,14 @@ namespace {
 %nterm <std::vector<std::string>> path
 %nterm <std::optional<std::string>> projection_alias
 %nterm <std::pair<std::string, std::string>> binding
-%nterm <std::optional<EqualityPredicate>> predicate
+%nterm <std::vector<EqualityPredicate>> where_clause equalities
 %nterm <SqlValue> literal
 %start input
 
 %%
 
 input:
-    SELECT distinct projections FROM binding predicate SEMICOLON END {
+    SELECT distinct projections FROM binding where_clause SEMICOLON END {
         result = Query{std::move($5.first), std::move($5.second),
                        std::move($3), std::move($6), $2};
     }
@@ -90,10 +90,18 @@ binding:
   | IDENTIFIER AS IDENTIFIER { $$ = {std::move($1), std::move($3)}; }
 ;
 
-predicate:
-    %empty { $$ = std::nullopt; }
-  | WHERE path EQUAL literal {
-        $$ = EqualityPredicate{make_path(std::move($2)), std::move($4)};
+where_clause:
+    %empty { $$ = {}; }
+  | WHERE equalities { $$ = std::move($2); }
+;
+
+equalities:
+    path EQUAL literal {
+        $$.push_back(EqualityPredicate{make_path(std::move($1)), std::move($3)});
+    }
+  | equalities AND path EQUAL literal {
+        $$ = std::move($1);
+        $$.push_back(EqualityPredicate{make_path(std::move($3)), std::move($5)});
     }
 ;
 

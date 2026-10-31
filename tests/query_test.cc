@@ -53,7 +53,7 @@ int main() {
     };
     const Query example{
         "WROTE", "w", {{Path{"w", {"author", "name"}}, "author_name"}},
-        EqualityPredicate{Path{"w", {"paper", "title"}}, std::string{"Databases"}}, true
+        {EqualityPredicate{Path{"w", {"paper", "title"}}, std::string{"Databases"}}}, true
     };
 
     try {
@@ -70,7 +70,7 @@ int main() {
 
         Query direct{
             "AUTHOR", "a", {{Path{"a", {"name"}}, std::nullopt}},
-            EqualityPredicate{Path{"a", {"aid"}}, std::numeric_limits<std::int64_t>::max()}
+            {EqualityPredicate{Path{"a", {"aid"}}, std::numeric_limits<std::int64_t>::max()}}
         };
         const auto direct_result = compile_query(direct, catalog);
         require(join_count(direct_result.sql) == 0, "Direct columns unexpectedly added a join");
@@ -79,21 +79,21 @@ int main() {
         require(direct_result.parameters ==
                     std::vector<SqlValue>{std::numeric_limits<std::int64_t>::max()},
                 "Integer parameter lost its value or type");
-        direct.where.reset();
+        direct.where.clear();
         require(compile_query(direct, catalog).parameters.empty(),
                 "Query without a predicate unexpectedly returned parameters");
 
         Query repeated{
             "WROTE", "w", {{Path{"w", {"author", "name"}}, "name"},
                            {Path{"w", {"author", "aid"}}, "id"}},
-            EqualityPredicate{Path{"w", {"author", "name"}}, std::string{"Alice"}}
+            {EqualityPredicate{Path{"w", {"author", "name"}}, std::string{"Alice"}}}
         };
         require(join_count(compile_query(repeated, catalog).sql) == 1,
                 "Repeated reference paths did not reuse their join");
 
         const Query roles{
             "PAPER", "p", {{Path{"p", {"lead_author", "name"}}, "lead"},
-                           {Path{"p", {"editor", "name"}}, "editor"}}, std::nullopt
+                           {Path{"p", {"editor", "name"}}, "editor"}}, {}
         };
         const auto role_result = compile_query(roles, catalog);
         require(join_count(role_result.sql) == 2, "Different reference roles were merged");
@@ -104,7 +104,7 @@ int main() {
         const Query multi_hop{
             "WROTE", "w", {{Path{"w", {"author", "name"}}, std::nullopt},
                            {Path{"w", {"author", "university", "country"}}, std::nullopt}},
-            EqualityPredicate{Path{"w", {"author", "university", "country"}}, std::string{"CA"}}
+            {EqualityPredicate{Path{"w", {"author", "university", "country"}}, std::string{"CA"}}}
         };
         const auto multi_result = compile_query(multi_hop, catalog);
         require(multi_result.sql ==
@@ -117,9 +117,26 @@ int main() {
         require(multi_result.parameters == std::vector<SqlValue>{std::string{"CA"}},
                 "Deep predicate parameter lost its value or type");
 
+        Query conjunction = multi_hop;
+        conjunction.where = {
+            {Path{"w", {"paper", "pid"}}, std::int64_t{10}},
+            {Path{"w", {"author", "university", "country"}}, std::string{"CA"}},
+            {Path{"w", {"author", "aid"}}, std::int64_t{1}},
+            {Path{"w", {"paper", "title"}}, std::string{"Databases"}}
+        };
+        const auto and_result = compile_query(conjunction, catalog);
+        require(and_result.sql.find(
+                    "\nWHERE \"w_ref2\".\"pid\" = ? AND \"w_ref1\".\"country\" = ?"
+                    " AND \"w_ref0\".\"aid\" = ? AND \"w_ref2\".\"title\" = ?;") != std::string::npos,
+                "Conjunction terms did not preserve source order");
+        require(and_result.parameters == std::vector<SqlValue>{
+                    std::int64_t{10}, std::string{"CA"}, std::int64_t{1}, std::string{"Databases"}},
+                "Conjunction parameters lost their order or types");
+        require(join_count(and_result.sql) == 3, "Conjunction terms did not reuse shared joins");
+
         const Query branches{
             "PAPER", "p", {{Path{"p", {"lead_author", "university", "country"}}, "lead_country"},
-                           {Path{"p", {"editor", "university", "country"}}, "editor_country"}}, std::nullopt
+                           {Path{"p", {"editor", "university", "country"}}, "editor_country"}}, {}
         };
         const auto branch_result = compile_query(branches, catalog);
         require(join_count(branch_result.sql) == 4 &&
@@ -130,7 +147,7 @@ int main() {
         const Query revisits{
             "AUTHOR", "a", {{Path{"a", {"mentor", "name"}}, std::nullopt},
                             {Path{"a", {"mentor", "mentor", "name"}}, std::nullopt}},
-            EqualityPredicate{Path{"a", {"mentor", "mentor", "aid"}}, std::int64_t{1}}
+            {EqualityPredicate{Path{"a", {"mentor", "mentor", "aid"}}, std::int64_t{1}}}
         };
         const auto revisit_result = compile_query(revisits, catalog);
         require(join_count(revisit_result.sql) == 2 &&
@@ -146,14 +163,14 @@ int main() {
                 "A quoted role containing a dot collided with a multi-component prefix");
 
         Query collision{
-            "WROTE", "W_REF0", {{Path{"W_REF0", {"author", "name"}}, std::nullopt}}, std::nullopt
+            "WROTE", "W_REF0", {{Path{"W_REF0", {"author", "name"}}, std::nullopt}}, {}
         };
         require(compile_query(collision, catalog).sql.find("AS \"W_REF0_ref0\"") != std::string::npos,
                 "Generated alias collided with the FROM alias");
 
         Query quoted = example;
         const std::string literal{"O'Reilly' OR 1=1 --"};
-        quoted.where->value = literal;
+        quoted.where[0].value = literal;
         const auto quoted_result = compile_query(quoted, catalog);
         require(quoted_result.sql == compiled.sql &&
                     quoted_result.parameters == std::vector<SqlValue>{literal},
@@ -161,7 +178,7 @@ int main() {
 
         const Catalog reserved{{{"order", {{"select", ColumnType::String}}}}, {}};
         const Query reserved_query{
-            "order", "from", {{Path{"from", {"select"}}, "display\"name"}}, std::nullopt
+            "order", "from", {{Path{"from", {"select"}}, "display\"name"}}, {}
         };
         require(compile_query(reserved_query, reserved).sql ==
                     "SELECT \"from\".\"select\" AS \"display\"\"name\"\nFROM \"order\" AS \"from\";",
@@ -174,7 +191,7 @@ int main() {
         invalid.projections[0].path = Path{"other", {"author", "name"}};
         require_invalid(invalid, catalog, "Unbound projection alias was accepted");
         invalid = example;
-        invalid.where->path = Path{"other", {"paper", "title"}};
+        invalid.where[0].path = Path{"other", {"paper", "title"}};
         require_invalid(invalid, catalog, "Unbound predicate alias was accepted");
         invalid = example;
         invalid.source_table = "UNKNOWN";
@@ -189,7 +206,7 @@ int main() {
         invalid.projections[0].path = Path{"w", {"paper", "missing", "name"}};
         require_invalid(invalid, catalog, "Unknown intermediate reference was accepted");
         invalid = example;
-        invalid.where->value = std::int64_t{42};
+        invalid.where[0].value = std::int64_t{42};
         require_invalid(invalid, catalog, "Wrong predicate literal type was accepted");
         invalid = example;
         invalid.projections[0].alias = "";
@@ -221,8 +238,21 @@ int main() {
         invalid_catalog.references[4].target_column = "missing";
         require_invalid(multi_hop, invalid_catalog, "Missing target key at a later hop was accepted");
         invalid = multi_hop;
-        invalid.where->value = std::int64_t{42};
+        invalid.where[0].value = std::int64_t{42};
         require_invalid(invalid, catalog, "Wrong literal type for a deep terminal column was accepted");
+
+        // Every condition is checked, even after a contradictory pair.
+        invalid = example;
+        invalid.where = {
+            {Path{"w", {"author", "aid"}}, std::int64_t{1}},
+            {Path{"w", {"author", "aid"}}, std::int64_t{2}},
+            {Path{"w", {"paper", "title"}}, std::int64_t{10}}
+        };
+        require_invalid(invalid, catalog, "Wrong literal type in a later condition was accepted");
+        invalid.where.back() = {Path{"w", {"paper", "missing"}}, std::string{"Databases"}};
+        require_invalid(invalid, catalog, "Unknown column in a later condition was accepted");
+        invalid.where.back() = {Path{"other", {"paper", "title"}}, std::string{"Databases"}};
+        require_invalid(invalid, catalog, "Unbound alias in a later condition was accepted");
 
         std::cout << "query compiler checks passed\n";
     } catch (const std::exception &error) {
