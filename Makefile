@@ -70,6 +70,7 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	@./build/lexer_test
 	@./build/parser_test
 	python3 tests/compiler_cli_test.py
+	python3 tests/dataset_check_test.py
 
 clean:
 	rm -rf build

@@ -1,6 +1,6 @@
 # Agent context — SQLP for AI Agents
 
-Updated October 31, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
+Updated November 1, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
 
 ## Current direction and context
 
@@ -36,7 +36,7 @@ Iris's runner orchestrates execution; Sam's UI calls it. Iris and Sam share ques
 
 ## Actual code at this update
 
-Verified October 31: `make test` passes the three legacy suites, query-compiler checks, lexer/parser checks, and twenty-three CLI integration tests. Trace checks cover each path occurrence, shared join IDs, competing roles, finite cycles, dotted components, raw identifiers, and absence of partial traces on errors. CLI tests also check actual SQLite row bags, typed parameter order, structured errors, and failed I/O. Recheck the working tree before assigning unfinished work.
+Verified November 1: `make test` passes the three legacy suites, query-compiler checks, lexer/parser checks, twenty-three CLI integration tests, and nineteen dataset-preflight tests. Coverage includes translation traces, actual SQLite row bags, typed parameters, collation ambiguity, missing schema/keys, read-only file handling, and transaction preservation. Recheck the working tree before assigning unfinished work.
 
 | Files | Present behavior |
 |---|---|
@@ -48,10 +48,14 @@ Verified October 31: `make test` passes the three legacy suites, query-compiler 
 | `src/lexer.h`, `.cc` | Owned-input `Lexer::next()` produces tokens with source spans, decoded text, and checked int64 values. Supports keywords, identifiers, SQL-style quoting, punctuation, and comments; malformed input throws a located `LexerError`. |
 | `src/parser.h`, `.cc`, `.yy` | Bison C++ grammar and lexer adapter. `parse_query` builds the existing query AST; `compile_sqlp` compiles text using a supplied C++ catalog. Syntax errors throw `ParseError` with a source location. Generated parser files stay under ignored `build/`. |
 | `src/compiler_main.cc` | `build/sqlpc`: catalog flags and SQLP stdin produce version-1 JSON with SQL, typed parameters, path/join traces, or a structured diagnostic. Validates supplied reference metadata before compilation. See [COMPILER_CLI.md](COMPILER_CLI.md) for the provisional runner/UI interface. |
+| `tools/validate_dataset.py` | Python standard-library preflight for actual schema, storage types, keys, and reference cardinality in a SQLite read snapshot. A version-1 JSON catalog also supplies `sqlpc` arguments through `compiler_arguments`. See [DATASET_CHECKS.md](DATASET_CHECKS.md). |
+| `examples/academic/` | Fictional development fixture and catalog covering multi-hop roles, duplicate rows, and a finite mentor cycle. Not a held-out benchmark or model result. |
 | `src/main.cc` | Constructs and prints `w.author.name`. It does not compile text. |
 | `tests/` | C++ path/mapping/SQL/query/lexer/parser suites and Python CLI integration tests with standard-library SQLite. Legacy Test 10 still demonstrates manual SQL rendering. |
 
-The legacy lower-level `resolve_path` still requires exactly two features and a caller-supplied source table/target alias. `compile_query` now walks finite reference chains itself, allocating aliases, validating roots, checking key types/uniqueness at every hop, and checking the terminal column/literal type. Join reuse uses the source SQL alias and role; different prefixes stay distinct even when they reach the same table. Unlike the C++ object API, the CLI also rejects duplicate catalog declarations and validates unused references. Actual row integrity is not validated; `ColumnSchema.unique` is metadata, not proof about imported rows.
+The legacy lower-level `resolve_path` still requires exactly two features and a caller-supplied source table/target alias. `compile_query` walks finite reference chains, allocating aliases, validating roots, checking key types/uniqueness at every hop, and checking the terminal column/literal type. Join reuse uses the source SQL alias and role; different prefixes stay distinct even when they reach the same table. Unlike the C++ object API, the CLI also rejects duplicate catalog declarations and validates unused references. C++ compilation does not check actual rows; use the separate Python preflight below.
+
+The separate Python preflight now checks those declarations against actual data: exact main-schema names, non-NULL storage classes, non-null/unique declared keys, and exactly one target per non-null reference source. It permits NULL ordinary attributes and duplicate source rows. Source-left SQLite equality preserves collation behavior; TEMP shadows are rejected. Use fixed tables/deterministic views. The CLI is read-only, and the API preserves caller transactions. Run before both experimental conditions; setup failures are separate from agent query failures.
 
 `CompiledQuery.trace` owns join metadata and every path occurrence (SELECT order, then WHERE order). `PathTrace` stores clause/index, decoded `Path` components, ordered join IDs, and the final table/column. Join IDs are array positions local to one compilation; direct columns use no joins. Keep components structured because a quoted role may contain dots. Traces describe translation; source-text spans and row provenance remain future work.
 
@@ -74,7 +78,7 @@ Requirements are GNU Make 4.3+, a C++20-capable `g++`, and Bison 3.8+. `make` bu
 The object compiler, tokenizer, and Bison parser are implemented. Trace `tests/parser_test.cc` from SQLP text through `parse_query` and `compile_sqlp`. `Query.distinct` defaults to false; `std::optional` represents absent projection aliases; `SqlValue` preserves string/int64 types. `Query.where` is now a vector of `EqualityPredicate`, replacing the old optional single predicate; an empty vector omits WHERE. Conditions and parameters retain source order, and every term is validated. Tokens own their text and carry start/exclusive-end locations: zero-based byte offsets and one-based byte columns, with CRLF as one line break. Lexical failures propagate as `LexerError`; grammar failures use `ParseError`. Name/type errors still come from `compile_query` without source locations.
 
 1. Review the provisional CLI and trace format with Iris/Sam; connect the runner and path inspection using [COMPILER_CLI.md](COMPILER_CLI.md). The compiler does not execute SQL. Larger catalogs will need a file interface beyond the current argv limit.
-2. Add dataset checks for Iris. Keep actual-row validation separate from catalog declarations.
+2. Select/review a workload and dataset, using the preflight and shared catalog format. Keep the tiny academic fixture in development; prepare independent answers for the real comparison.
 
 Lexer conventions: bare identifiers use ASCII letters/underscore followed by letters/digits/underscore; double quotes allow other identifier characters. Strings use single quotes; repeated delimiters escape a quote and backslashes are literal. Decimal int64 values may have an adjacent minus sign. Plus signs, fractional/exponent/hex forms, empty quoted identifiers, embedded NULs, and unterminated quotes/comments are rejected. Line comments (`--`) and non-nested block comments (`/* ... */`) are skipped. Lexical acceptance does not imply that syntax or semantics are supported.
 

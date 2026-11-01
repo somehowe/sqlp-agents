@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "tables": [
+    {"name": "UNIVERSITY", "columns": [
+      {"name": "uid", "type": "integer", "unique": true},
+      {"name": "name", "type": "string", "unique": false},
+      {"name": "country", "type": "string", "unique": false}
+    ]},
+    {"name": "AUTHOR", "columns": [
+      {"name": "aid", "type": "integer", "unique": true},
+      {"name": "name", "type": "string", "unique": false},
+      {"name": "uni_id", "type": "integer", "unique": false},
+      {"name": "mentor_aid", "type": "integer", "unique": false}
+    ]},
+    {"name": "PAPER", "columns": [
+      {"name": "pid", "type": "integer", "unique": true},
+      {"name": "title", "type": "string", "unique": false},
+      {"name": "publisher_uid", "type": "integer", "unique": false}
+    ]},
+    {"name": "WROTE", "columns": [
+      {"name": "author_aid", "type": "integer", "unique": false},
+      {"name": "paper_pid", "type": "integer", "unique": false}
+    ]}
+  ],
+  "references": [
+    {"source_table": "WROTE", "feature": "author", "source_column": "author_aid", "target_table": "AUTHOR", "target_column": "aid"},
+    {"source_table": "WROTE", "feature": "paper", "source_column": "paper_pid", "target_table": "PAPER", "target_column": "pid"},
+    {"source_table": "AUTHOR", "feature": "university", "source_column": "uni_id", "target_table": "UNIVERSITY", "target_column": "uid"},
+    {"source_table": "AUTHOR", "feature": "mentor", "source_column": "mentor_aid", "target_table": "AUTHOR", "target_column": "aid"},
+    {"source_table": "PAPER", "feature": "publisher", "source_column": "publisher_uid", "target_table": "UNIVERSITY", "target_column": "uid"}
+  ]
+}
