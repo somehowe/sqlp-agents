@@ -1,6 +1,6 @@
 # Calling the SQLP compiler
 
-`build/sqlpc` is the first callable handoff for Iris's runner. It compiles one SQLP query into SQL and parameters. The runner executes that SQL in SQLite.
+`build/sqlpc` is the first callable handoff for Iris's runner. It compiles one SQLP query into SQL, parameters, and a path-to-join trace for Sam's interface. The runner executes that SQL in SQLite.
 
 Build from the repository root with `make`. Requirements: GNU Make 4.3+, Bison 3.8+, and a C++20-capable `g++`. `make test` also uses Python 3 and its standard-library SQLite module.
 
@@ -27,13 +27,30 @@ This is a provisional version-1 interface to review with Iris. She can keep a JS
 
 ## Response and errors
 
-Except for `--help` supplied alone, stdout contains one UTF-8 JSON object followed by a newline. A successful response has this shape:
+Except for `--help` supplied alone, stdout contains one UTF-8 JSON object followed by a newline. Here is a successful response for a direct-column query:
 
 ```json
-{"version":1,"ok":true,"sql":"SELECT ... WHERE ... = ? AND ... = ?;","parameters":[{"type":"string","value":"CA"},{"type":"int64","value":"1"}]}
+{
+  "version": 1, "ok": true,
+  "sql": "SELECT \"a\".\"name\"\nFROM \"AUTHOR\" AS \"a\";",
+  "parameters": [],
+  "trace": {
+    "joins": [],
+    "paths": [{"clause":"select","index":0,"root":"a","features":["name"],
+               "join_ids":[],"column":{"table":"AUTHOR","alias":"a","column":"name"}}]
+  }
+}
 ```
 
 The `sql` field contains the complete generated SQL. Parameters follow the conditions' source order and match the generated `?` placeholders. Repeated conditions retain separate parameters. **Both parameter types encode their values as JSON strings.** For example, `{"type":"int64","value":"9223372036854775807"}` preserves an integer that JavaScript numbers cannot represent exactly. Convert `int64` values to Python integers before binding; leave `string` values unchanged.
+
+`trace.joins` lists the generated joins in SQL order. Each entry has a `role` and `source`/`target` objects containing the raw physical `table`, SQL `alias`, and join `column`. Its array position is its join ID. A path's ordered `join_ids` point into this same array, so shared prefixes point to the same joins. IDs are local to one compilation and can change when a query changes.
+
+`trace.paths` records every path occurrence, SELECT first and then WHERE. `clause` is `select` or `where`; `index` is the zero-based position within that clause's projection/condition list. `root` and `features` preserve decoded path components; `column` identifies the final SQL column. Direct columns have empty `join_ids`. For the first example, the WHERE country path has features `["author","university","country"]` and join IDs `[0,1]`.
+
+Sam can use these records to show a path's reference roles and join columns. Keep component arrays intact: `["author.university","country"]` names a different path from `["author","university","country"]`. Names in the trace are unquoted; SQL identifiers are quoted in `sql`. Source-text spans and row provenance remain future work. Failed compilations return an error without a partial trace.
+
+The trace is an additive version-1 field. Consumers should ignore unknown output fields; the existing SQL, parameter, and error formats are unchanged.
 
 Failures have this shape:
 
@@ -92,6 +109,6 @@ One FROM alias, projections with optional `AS`, optional `DISTINCT`, and an opti
 
 Shared prefixes reuse joins across projections and all conditions. Different roles and repeated visits to the same table get separate aliases; finite paths such as `a.mentor.mentor.name` are supported. Every hop checks key types and the target's uniqueness declaration. Every condition is validated, including later terms after a contradictory pair.
 
-The FROM alias and final semicolon are required. OR, NOT, parentheses, and comparisons beyond literal equality are unsupported. Path-to-join traces are still to come. The CLI flags and JSON protocol are unchanged.
+The FROM alias and final semicolon are required. OR, NOT, parentheses, and comparisons beyond literal equality are unsupported. The CLI flags are unchanged.
 
 [Project idea](IDEA.md) · [Agent context](AGENTS.md)

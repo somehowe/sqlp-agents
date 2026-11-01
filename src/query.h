@@ -3,7 +3,9 @@
 
 #include "catalog.h"
 #include "path.h"
+#include "sql.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -32,9 +34,34 @@ struct Query {
     bool distinct = false;
 };
 
+// Join IDs are positions in TranslationTrace.joins, local to one compilation.
+// Names are raw catalog identifiers; SQL quoting happens only when rendering.
+struct JoinTrace {
+    std::string role;
+    std::string source_table;
+    JoinSpec join;
+};
+
+enum class PathClause { Select, Where };
+
+struct PathTrace {
+    PathClause clause;
+    std::size_t index; // Position in the projection or WHERE vector.
+    Path path;        // Owned, decoded components; a quoted dot stays in one component.
+    std::string terminal_table;
+    ColumnRef column;
+    std::vector<std::size_t> join_ids;
+};
+
+struct TranslationTrace {
+    std::vector<JoinTrace> joins;
+    std::vector<PathTrace> paths; // Every occurrence, SELECT first, then WHERE.
+};
+
 struct CompiledQuery {
     std::string sql;
     std::vector<SqlValue> parameters;
+    TranslationTrace trace;
 };
 
 // Supports direct columns and finite multi-hop reference paths. Literal values

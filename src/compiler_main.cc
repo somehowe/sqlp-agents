@@ -73,6 +73,55 @@ void error_response(std::string_view stage, const std::string &message,
     std::cout << "}}\n";
 }
 
+void json_column(const std::string &table, const ColumnRef &column) {
+    std::cout << "{\"table\":";
+    json_string(table);
+    std::cout << ",\"alias\":";
+    json_string(column.alias);
+    std::cout << ",\"column\":";
+    json_string(column.column);
+    std::cout << '}';
+}
+
+void trace_response(const TranslationTrace &trace) {
+    std::cout << "{\"joins\":[";
+    for (std::size_t i = 0; i < trace.joins.size(); ++i) {
+        if (i != 0) std::cout << ',';
+        const auto &entry = trace.joins[i];
+        std::cout << "{\"role\":";
+        json_string(entry.role);
+        std::cout << ",\"source\":";
+        json_column(entry.source_table, entry.join.source);
+        std::cout << ",\"target\":";
+        json_column(entry.join.target_table, entry.join.target);
+        std::cout << '}';
+    }
+    std::cout << "],\"paths\":[";
+    for (std::size_t i = 0; i < trace.paths.size(); ++i) {
+        if (i != 0) std::cout << ',';
+        const auto &entry = trace.paths[i];
+        std::cout << "{\"clause\":";
+        json_string(entry.clause == PathClause::Select ? "select" : "where");
+        std::cout << ",\"index\":" << entry.index << ",\"root\":";
+        json_string(entry.path.root());
+        std::cout << ",\"features\":[";
+        const auto &features = entry.path.features();
+        for (std::size_t j = 0; j < features.size(); ++j) {
+            if (j != 0) std::cout << ',';
+            json_string(features[j]);
+        }
+        std::cout << "],\"join_ids\":[";
+        for (std::size_t j = 0; j < entry.join_ids.size(); ++j) {
+            if (j != 0) std::cout << ',';
+            std::cout << entry.join_ids[j];
+        }
+        std::cout << "],\"column\":";
+        json_column(entry.terminal_table, entry.column);
+        std::cout << '}';
+    }
+    std::cout << "]}";
+}
+
 void success_response(const CompiledQuery &compiled) {
     std::cout << "{\"version\":1,\"ok\":true,\"sql\":";
     json_string(compiled.sql);
@@ -87,7 +136,9 @@ void success_response(const CompiledQuery &compiled) {
         json_string(integer ? std::to_string(std::get<std::int64_t>(value)) : std::get<std::string>(value));
         std::cout << '}';
     }
-    std::cout << "]}\n";
+    std::cout << "],\"trace\":";
+    trace_response(compiled.trace);
+    std::cout << "}\n";
 }
 
 std::string folded(std::string name) {

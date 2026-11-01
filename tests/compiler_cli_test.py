@@ -80,6 +80,8 @@ class CompilerCliTests(unittest.TestCase):
         record = json.loads(text)
         self.assertEqual(record["version"], 1)
         self.assertEqual(record["ok"], code == 0)
+        if code != 0:
+            self.assertNotIn("trace", record)
         if stage:
             self.assertEqual(record["error"]["stage"], stage)
             self.assertTrue(record["error"]["message"])
@@ -234,6 +236,103 @@ class CompilerCliTests(unittest.TestCase):
                             code=1, stage="parser")
         self.invoke("SELECT a.name FROM AUTHOR a WHERE (a.aid = 1) AND a.name = 'Alice';",
                     code=1, stage="lexer")
+
+    def test_trace_records_occurrences_and_shared_prefixes(self):
+        record = self.invoke(
+            "SELECT w.author_aid, w.author.name, w.author.university.country, w.author.name "
+            "FROM WROTE w WHERE w.author.university.country = 'CA' AND w.author.aid = 1;",
+            MULTIHOP_CATALOG)
+        trace = record["trace"]
+        self.assertEqual(trace["joins"], [
+            {"role": "author", "source": {"table": "WROTE", "alias": "w", "column": "author_aid"},
+             "target": {"table": "AUTHOR", "alias": "w_ref0", "column": "aid"}},
+            {"role": "university", "source": {"table": "AUTHOR", "alias": "w_ref0", "column": "uni_id"},
+             "target": {"table": "UNIVERSITY", "alias": "w_ref1", "column": "uid"}},
+        ])
+        paths = trace["paths"]
+        self.assertEqual([(p["clause"], p["index"]) for p in paths],
+                         [("select", 0), ("select", 1), ("select", 2), ("select", 3),
+                          ("where", 0), ("where", 1)])
+        self.assertEqual([p["join_ids"] for p in paths], [[], [0], [0, 1], [0], [0, 1], [0]])
+        self.assertEqual(paths[0], {"clause": "select", "index": 0, "root": "w",
+                                   "features": ["author_aid"], "join_ids": [],
+                                   "column": {"table": "WROTE", "alias": "w", "column": "author_aid"}})
+        self.assertEqual(paths[2]["column"], {"table": "UNIVERSITY", "alias": "w_ref1", "column": "country"})
+        for join in trace["joins"]:
+            source, target = join["source"], join["target"]
+            fragment = (f"JOIN {identifier(target['table'])} AS {identifier(target['alias'])} "
+                        f"ON {identifier(source['alias'])}.{identifier(source['column'])} = "
+                        f"{identifier(target['alias'])}.{identifier(target['column'])}")
+            self.assertIn(fragment, record["sql"])
+        with multihop_fixture() as database:
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+        self.assertCountEqual(rows, [(1, "Alice", "CA", "Alice"), (1, "Alice", "CA", "Alice")])
+
+    def test_trace_keeps_roles_and_self_reference_visits_distinct(self):
+        roles = self.invoke(
+            "SELECT w.author.university.country, w.paper.publisher.country FROM WROTE w;",
+            MULTIHOP_CATALOG)["trace"]
+        self.assertEqual([j["role"] for j in roles["joins"]], ["author", "university", "paper", "publisher"])
+        self.assertEqual([p["join_ids"] for p in roles["paths"]], [[0, 1], [2, 3]])
+        self.assertNotEqual(roles["paths"][0]["column"]["alias"], roles["paths"][1]["column"]["alias"])
+        record = self.invoke(
+            "SELECT a.name, a.mentor.name, a.mentor.mentor.name, a.university.country, "
+            "a.mentor.university.country FROM AUTHOR a WHERE a.mentor.mentor.aid = 1;",
+            MULTIHOP_CATALOG)
+        trace = record["trace"]
+        self.assertEqual([p["join_ids"] for p in trace["paths"]], [[], [0], [0, 1], [2], [0, 3], [0, 1]])
+        self.assertEqual([j["source"]["alias"] for j in trace["joins"]], ["a", "a_ref0", "a", "a_ref0"])
+        self.assertEqual(len({j["target"]["alias"] for j in trace["joins"]}), 4)
+        with multihop_fixture() as database:
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+        self.assertCountEqual(rows, [("Alice", "Bob", "Alice", "CA", "DK"),
+                                     ("Caro", "Bob", "Alice", "CA", "DK")])
+
+    def test_trace_distinguishes_dotted_role_from_multiple_components(self):
+        args = MULTIHOP_CATALOG + [
+            "--column", "WROTE", "direct_uid", "integer", "nonunique",
+            "--reference", "WROTE", "author.university", "direct_uid", "UNIVERSITY", "uid",
+        ]
+        record = self.invoke(
+            'SELECT w.author.university.country, w."author.university".country FROM WROTE w;', args)
+        paths = record["trace"]["paths"]
+        self.assertEqual([p["features"] for p in paths],
+                         [["author", "university", "country"], ["author.university", "country"]])
+        self.assertEqual([p["join_ids"] for p in paths], [[0, 1], [2]])
+        self.assertEqual([j["role"] for j in record["trace"]["joins"]],
+                         ["author", "university", "author.university"])
+        with multihop_fixture() as database:
+            database.execute("ALTER TABLE WROTE ADD COLUMN direct_uid INTEGER")
+            database.execute("UPDATE WROTE SET direct_uid = (SELECT uni_id FROM AUTHOR WHERE aid = author_aid)")
+            rows = database.execute(record["sql"], self.parameters(record)).fetchall()
+        self.assertCountEqual(rows, [("CA", "CA"), ("CA", "CA"), ("DK", "DK"),
+                                     ("CA", "CA"), ("DK", "DK")])
+
+    def test_trace_preserves_raw_quoted_and_unicode_names(self):
+        source_table, source_key = 'root" café', 'key\t"'
+        target_table, target_key, column, role = 'node\n🧠', 'id"key', 'value\nfield', 'friend.with.dot'
+        args = [
+            "--column", source_table, source_key, "integer", "nonunique",
+            "--column", target_table, target_key, "integer", "unique",
+            "--column", target_table, column, "string", "nonunique",
+            "--reference", source_table, role, source_key, target_table, target_key,
+        ]
+        path = f"r.{identifier(role)}.{identifier(column)}"
+        record = self.invoke(f"SELECT {path} FROM {identifier(source_table)} r WHERE {path} = 'hi';", args)
+        self.assertEqual(record["trace"]["joins"], [
+            {"role": role, "source": {"table": source_table, "alias": "r", "column": source_key},
+             "target": {"table": target_table, "alias": "r_ref0", "column": target_key}},
+        ])
+        for item in record["trace"]["paths"]:
+            self.assertEqual(item["features"], [role, column])
+            self.assertEqual(item["column"], {"table": target_table, "alias": "r_ref0", "column": column})
+        with sqlite3.connect(":memory:") as database:
+            database.execute(f"CREATE TABLE {identifier(source_table)}({identifier(source_key)} INTEGER)")
+            database.execute(f"CREATE TABLE {identifier(target_table)}({identifier(target_key)} INTEGER PRIMARY KEY, "
+                             f"{identifier(column)} TEXT)")
+            database.execute(f"INSERT INTO {identifier(source_table)} VALUES (1)")
+            database.execute(f"INSERT INTO {identifier(target_table)} VALUES (1, 'hi')")
+            self.assertEqual(database.execute(record["sql"], self.parameters(record)).fetchall(), [("hi",)])
 
     def test_quoted_names_unicode_and_control_characters_round_trip(self):
         table, column, alias = 'table" café', 'field\t\n"', 'from'

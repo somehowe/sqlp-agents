@@ -74,6 +74,12 @@ int main() {
         };
         const auto direct_result = compile_query(direct, catalog);
         require(join_count(direct_result.sql) == 0, "Direct columns unexpectedly added a join");
+        require(direct_result.trace.joins.empty() && direct_result.trace.paths.size() == 2 &&
+                    direct_result.trace.paths[0].join_ids.empty() &&
+                    direct_result.trace.paths[0].terminal_table == "AUTHOR" &&
+                    direct_result.trace.paths[0].column.alias == "a" &&
+                    direct_result.trace.paths[0].column.column == "name",
+                "Direct-column trace was missing or introduced a join");
         require(direct_result.sql.find("DISTINCT") == std::string::npos,
                 "Compiler added DISTINCT without being asked");
         require(direct_result.parameters ==
@@ -116,6 +122,19 @@ int main() {
                 "Multi-hop paths did not reuse their prefixes or chain the correct join sources");
         require(multi_result.parameters == std::vector<SqlValue>{std::string{"CA"}},
                 "Deep predicate parameter lost its value or type");
+        const auto &trace = multi_result.trace;
+        require(trace.joins.size() == 2 && trace.joins[1].role == "university" &&
+                    trace.joins[1].source_table == "AUTHOR" &&
+                    trace.joins[1].join.source.alias == "w_ref0" &&
+                    trace.joins[1].join.target.alias == "w_ref1",
+                "C++ trace did not retain raw join metadata");
+        require(trace.paths.size() == 3 &&
+                    trace.paths[0].join_ids == std::vector<std::size_t>{0} &&
+                    trace.paths[1].join_ids == std::vector<std::size_t>{0, 1} &&
+                    trace.paths[2].join_ids == trace.paths[1].join_ids &&
+                    trace.paths[2].clause == PathClause::Where && trace.paths[2].index == 0 &&
+                    trace.paths[2].path.features() == std::vector<std::string>{"author", "university", "country"},
+                "C++ trace lost path occurrences, components, or shared join IDs");
 
         Query conjunction = multi_hop;
         conjunction.where = {
@@ -133,6 +152,12 @@ int main() {
                     std::int64_t{10}, std::string{"CA"}, std::int64_t{1}, std::string{"Databases"}},
                 "Conjunction parameters lost their order or types");
         require(join_count(and_result.sql) == 3, "Conjunction terms did not reuse shared joins");
+        require(and_result.trace.paths.size() == 6, "Conjunction trace lost a path occurrence");
+        for (std::size_t index = 0; index < conjunction.where.size(); ++index) {
+            const auto &occurrence = and_result.trace.paths[conjunction.projections.size() + index];
+            require(occurrence.clause == PathClause::Where && occurrence.index == index,
+                    "Conjunction trace lost clause order or occurrence indexes");
+        }
 
         const Query branches{
             "PAPER", "p", {{Path{"p", {"lead_author", "university", "country"}}, "lead_country"},

@@ -66,7 +66,7 @@ SQLP's human study motivates the question. NatSQL already simplifies queries gen
 
 ## Scope for this submission
 
-The C++ compiler now parses SQLP text, compiles multi-hop paths and AND filters into SQL and parameters, and has a callable [command-line interface](COMPILER_CLI.md). We still need path inspection records, the agent runner, and the website.
+The C++ compiler now parses SQLP text, compiles multi-hop paths and AND filters into SQL and parameters, and returns path inspection records through its [command-line interface](COMPILER_CLI.md). We still need the agent runner and the website.
 
 We can start with a small collection of related tables in SQLite. A data-lake sample could provide useful questions, but the dataset is still to be chosen. **For now, we supply approved relationships to both agents.** Automatic discovery through something like SemDisc is a possible later extension.
 

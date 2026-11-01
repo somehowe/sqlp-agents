@@ -32,11 +32,6 @@ struct BoundColumn {
     ColumnType type;
 };
 
-struct ReferenceJoin {
-    std::string feature;
-    JoinSpec join;
-};
-
 bool matches_type(const SqlValue &value, ColumnType type) {
     return (type == ColumnType::Integer && std::holds_alternative<std::int64_t>(value)) ||
            (type == ColumnType::String && std::holds_alternative<std::string>(value));
@@ -51,9 +46,10 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
 
     const std::string source_table = quote_identifier(query.source_table);
     const std::string source_alias = quote_identifier(query.source_alias);
-    std::vector<ReferenceJoin> joins;
+    CompiledQuery result;
+    auto &joins = result.trace.joins;
 
-    auto bind_path = [&](const Path &path) -> BoundColumn {
+    auto bind_path = [&](const Path &path, PathClause clause, std::size_t occurrence) -> BoundColumn {
         if (path.root() != query.source_alias) {
             throw std::invalid_argument{"Path alias does not match the FROM binding: " + path.root()};
         }
@@ -65,6 +61,7 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
 
         std::string current_table = query.source_table;
         std::string current_alias = query.source_alias;
+        std::vector<std::size_t> join_ids;
         // All components except the last name references; the last names a column.
         for (std::size_t index = 0; index + 1 < features.size(); ++index) {
             const auto &feature = features[index];
@@ -79,31 +76,36 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
             }
 
             std::string target_alias;
-            for (const auto &reference : joins) {
+            std::size_t join_id = 0;
+            for (; join_id < joins.size(); ++join_id) {
+                const auto &reference = joins[join_id];
                 // The source binding distinguishes roles reached through different prefixes.
-                if (reference.join.source.alias == current_alias && reference.feature == feature) {
+                if (reference.join.source.alias == current_alias && reference.role == feature) {
                     target_alias = reference.join.target.alias;
                     break;
                 }
             }
-            if (target_alias.empty()) {
+            if (join_id == joins.size()) {
                 // A suffix on the root cannot collide with it, even ignoring ASCII case.
                 target_alias = query.source_alias + "_ref" + std::to_string(joins.size());
-                joins.push_back({feature, {mapping.target_table,
-                                          {current_alias, mapping.source_column},
-                                          {target_alias, mapping.target_column}}});
+                joins.push_back({feature, current_table, {mapping.target_table,
+                                                         {current_alias, mapping.source_column},
+                                                         {target_alias, mapping.target_column}}});
             }
+            join_ids.push_back(join_id);
             current_table = mapping.target_table;
             current_alias = std::move(target_alias);
         }
         const auto &column = find_column(catalog, current_table, features.back());
-        return {{std::move(current_alias), features.back()}, column.type};
+        ColumnRef column_ref{std::move(current_alias), features.back()};
+        result.trace.paths.push_back({clause, occurrence, path, current_table, column_ref, std::move(join_ids)});
+        return {std::move(column_ref), column.type};
     };
 
     std::string select_sql = query.distinct ? "SELECT DISTINCT " : "SELECT ";
     for (std::size_t index = 0; index < query.projections.size(); ++index) {
         const auto &projection = query.projections[index];
-        const auto bound = bind_path(projection.path);
+        const auto bound = bind_path(projection.path, PathClause::Select, index);
         if (index != 0) {
             select_sql += ", ";
         }
@@ -113,10 +115,10 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
         }
     }
 
-    CompiledQuery result;
     std::string where_sql;
-    for (const auto &predicate : query.where) {
-        const auto bound = bind_path(predicate.path);
+    for (std::size_t index = 0; index < query.where.size(); ++index) {
+        const auto &predicate = query.where[index];
+        const auto bound = bind_path(predicate.path, PathClause::Where, index);
         if (!matches_type(predicate.value, bound.type)) {
             throw std::invalid_argument{"Predicate literal type does not match the column type"};
         }
