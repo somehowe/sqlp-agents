@@ -4,7 +4,7 @@ The idea is to see how using SQLP affects an AI agent's query correctness and to
 
 **Research question:** Given equivalent schema and relationship information, how does using SQLP instead of SQL affect AI agents' query correctness and total token usage?
 
-I think this gives us a concrete question while keeping the compiler work useful. SQLP could make joins easier to express, but models already know SQL and would need instructions for SQLP. We haven't run the comparison yet, so either approach could perform better. No one has yet done this (others like NatSQL have done their own simplified language but no one has thought about using SQLP which potentially may be more intuitive to the models).
+I think this gives us a concrete question while keeping the compiler work useful. SQLP could make joins easier to express, but models already know SQL and would need instructions for SQLP. We haven't run the comparison yet, so either approach could perform better.
 
 ## Old Example of How the Joins Work (probably skip this, mainly for reference)
 
@@ -69,4 +69,3 @@ SQLP's human study motivates the question. NatSQL already simplifies queries gen
 The C++ compiler now parses SQLP text, compiles multi-hop paths and AND filters into SQL and parameters, and returns path inspection records through its [command-line interface](COMPILER_CLI.md). We still need the agent runner and the website.
 
 We can start with a small collection of related tables in SQLite. A data-lake sample could provide useful questions, but the dataset is still to be chosen. **For now, we supply approved relationships to both agents.** Automatic discovery through something like SemDisc is a possible later extension.
-
