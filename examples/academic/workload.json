@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "scope": "development",
+  "cases": [
+    {
+      "id": "canadian_authorships",
+      "question": "List the author name for every recorded authorship at a Canadian university, retaining duplicate records.",
+      "column_count": 1,
+      "sql": "SELECT a.name FROM WROTE w JOIN AUTHOR a ON w.author_aid = a.aid JOIN UNIVERSITY u ON a.uni_id = u.uid WHERE u.country = 'CA';",
+      "sqlp": "SELECT w.author.name FROM WROTE w WHERE w.author.university.country = 'CA';",
+      "expected_rows": [["Alice"], ["Alice"], ["Caro"]]
+    },
+    {
+      "id": "canadian_authors_distinct",
+      "question": "Which distinct author names occur on recorded authorships at Canadian universities?",
+      "column_count": 1,
+      "sql": "SELECT DISTINCT a.name FROM WROTE w JOIN AUTHOR a ON w.author_aid = a.aid JOIN UNIVERSITY u ON a.uni_id = u.uid WHERE u.country = 'CA';",
+      "sqlp": "SELECT DISTINCT w.author.name FROM WROTE w WHERE w.author.university.country = 'CA';",
+      "expected_rows": [["Alice"], ["Caro"]]
+    },
+    {
+      "id": "canadian_authors_danish_publishers",
+      "question": "List the author name for every recorded authorship at a Canadian university whose paper is published by a Danish university, retaining duplicate records.",
+      "column_count": 1,
+      "sql": "SELECT a.name FROM WROTE w JOIN AUTHOR a ON w.author_aid = a.aid JOIN UNIVERSITY u ON a.uni_id = u.uid JOIN PAPER p ON w.paper_pid = p.pid JOIN UNIVERSITY pub ON p.publisher_uid = pub.uid WHERE u.country = 'CA' AND pub.country = 'DK';",
+      "sqlp": "SELECT w.author.name FROM WROTE w WHERE w.author.university.country = 'CA' AND w.paper.publisher.country = 'DK';",
+      "expected_rows": [["Alice"], ["Alice"]]
+    },
+    {
+      "id": "mentor_cycle",
+      "question": "List each author's name, mentor's name, and mentor's mentor's name when that last person's identifier is 1.",
+      "column_count": 3,
+      "sql": "SELECT a.name, m.name, mm.name FROM AUTHOR a JOIN AUTHOR m ON a.mentor_aid = m.aid JOIN AUTHOR mm ON m.mentor_aid = mm.aid WHERE mm.aid = 1;",
+      "sqlp": "SELECT a.name, a.mentor.name, a.mentor.mentor.name FROM AUTHOR a WHERE a.mentor.mentor.aid = 1;",
+      "expected_rows": [["Alice", "Bob", "Alice"], ["Caro", "Bob", "Alice"]]
+    },
+    {
+      "id": "empty_us_authorships",
+      "question": "List author names on recorded authorships at universities with country code US.",
+      "column_count": 1,
+      "sql": "SELECT a.name FROM WROTE w JOIN AUTHOR a ON w.author_aid = a.aid JOIN UNIVERSITY u ON a.uni_id = u.uid WHERE u.country = 'US';",
+      "sqlp": "SELECT w.author.name FROM WROTE w WHERE w.author.university.country = 'US';",
+      "expected_rows": []
+    },
+    {
+      "id": "paper_author_pair",
+      "question": "List the paper title and author name for recorded authorships with author identifier 2 and paper title Databases.",
+      "column_count": 2,
+      "sql": "SELECT p.title, a.name FROM WROTE w JOIN PAPER p ON w.paper_pid = p.pid JOIN AUTHOR a ON w.author_aid = a.aid WHERE a.aid = 2 AND p.title = 'Databases';",
+      "sqlp": "SELECT w.paper.title, w.author.name FROM WROTE w WHERE w.author.aid = 2 AND w.paper.title = 'Databases';",
+      "expected_rows": [["Databases", "Bob"]]
+    }
+  ]
+}

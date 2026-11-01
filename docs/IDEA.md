@@ -66,6 +66,6 @@ SQLP's human study motivates the question. NatSQL already simplifies queries gen
 
 ## Scope for this submission
 
-The C++ compiler now parses SQLP text, compiles multi-hop paths and AND filters into SQL and parameters, and returns path inspection records through its [command-line interface](COMPILER_CLI.md). We still need the agent runner and the website.
+The C++ compiler parses SQLP text, compiles multi-hop paths and AND filters into SQL and parameters, and returns path inspection records through its [command-line interface](COMPILER_CLI.md). A [local comparison runner](QUERY_COMPARISON.md) now executes prepared SQL/SQLP pairs and checks their answers. We still need model calls, token logging, and the website; the prepared runs are development checks, not AI results.
 
 We can start with a small collection of related tables in SQLite. A data-lake sample could provide useful questions, but the dataset is still to be chosen. **For now, we supply approved relationships to both agents.** Automatic discovery through something like SemDisc is a possible later extension.

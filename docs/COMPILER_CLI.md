@@ -2,7 +2,7 @@
 
 `build/sqlpc` is the first callable handoff for Iris's runner. It compiles one SQLP query into SQL, parameters, and a path-to-join trace for Sam's interface. The runner executes that SQL in SQLite.
 
-Build from the repository root with `make`. Requirements: GNU Make 4.3+, Bison 3.8+, and a C++20-capable `g++`. `make test` also uses Python 3 and its standard-library SQLite module.
+Build from the repository root with `make`. Requirements: GNU Make 4.3+, Bison 3.8+, and a C++20-capable `g++`. `make test` also uses Python 3.11+ and its standard-library SQLite module.
 
 ## Try one query
 

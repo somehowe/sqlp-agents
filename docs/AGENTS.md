@@ -36,7 +36,7 @@ Iris's runner orchestrates execution; Sam's UI calls it. Iris and Sam share ques
 
 ## Actual code at this update
 
-Verified November 1: `make test` passes the three legacy suites, query-compiler checks, lexer/parser checks, twenty-three CLI integration tests, and nineteen dataset-preflight tests. Coverage includes translation traces, actual SQLite row bags, typed parameters, collation ambiguity, missing schema/keys, read-only file handling, and transaction preservation. Recheck the working tree before assigning unfinished work.
+Verified November 1: `make test` passes the legacy/C++ compiler suites, twenty-three CLI integration tests, nineteen dataset-preflight tests, and seventeen prepared-comparison tests. Comparison checks include row bags/projection width, numeric precision, read-only execution, limits, infrastructure failures, and snapshot consistency across an external WAL commit. All twelve prepared runs in the six-case academic workload match their independently written expected rows; these are development checks, not AI results. Recheck the working tree before assigning unfinished work.
 
 | Files | Present behavior |
 |---|---|
@@ -49,7 +49,8 @@ Verified November 1: `make test` passes the three legacy suites, query-compiler 
 | `src/parser.h`, `.cc`, `.yy` | Bison C++ grammar and lexer adapter. `parse_query` builds the existing query AST; `compile_sqlp` compiles text using a supplied C++ catalog. Syntax errors throw `ParseError` with a source location. Generated parser files stay under ignored `build/`. |
 | `src/compiler_main.cc` | `build/sqlpc`: catalog flags and SQLP stdin produce version-1 JSON with SQL, typed parameters, path/join traces, or a structured diagnostic. Validates supplied reference metadata before compilation. See [COMPILER_CLI.md](COMPILER_CLI.md) for the provisional runner/UI interface. |
 | `tools/validate_dataset.py` | Python standard-library preflight for actual schema, storage types, keys, and reference cardinality in a SQLite read snapshot. A version-1 JSON catalog also supplies `sqlpc` arguments through `compiler_arguments`. See [DATASET_CHECKS.md](DATASET_CHECKS.md). |
-| `examples/academic/` | Fictional development fixture and catalog covering multi-hop roles, duplicate rows, and a finite mentor cycle. Not a held-out benchmark or model result. |
+| `tools/run_comparison.py` | Prepared SQL/SQLP execution, row-bag answer checking, typed records, and per-condition diagnostics/limits on one read-only snapshot. No model calls or usage estimates. See [QUERY_COMPARISON.md](QUERY_COMPARISON.md). |
+| `examples/academic/` | Fictional development fixture, catalog, and six manually prepared paired-query cases. Covers multi-hop roles, duplicate rows, and a finite mentor cycle. Not a held-out benchmark or model result. |
 | `src/main.cc` | Constructs and prints `w.author.name`. It does not compile text. |
 | `tests/` | C++ path/mapping/SQL/query/lexer/parser suites and Python CLI integration tests with standard-library SQLite. Legacy Test 10 still demonstrates manual SQL rendering. |
 
@@ -59,7 +60,7 @@ The separate Python preflight now checks those declarations against actual data:
 
 `CompiledQuery.trace` owns join metadata and every path occurrence (SELECT order, then WHERE order). `PathTrace` stores clause/index, decoded `Path` components, ordered join IDs, and the final table/column. Join IDs are array positions local to one compilation; direct columns use no joins. Keep components structured because a quoted role may contain dots. Traces describe translation; source-text spans and row provenance remain future work.
 
-Text parsing, multi-hop compilation, and AND filters work through C++ functions and the CLI. There is no production SQLite adapter, model runner, or web interface yet. Boolean syntax beyond AND-connected literal equalities remains unsupported. The old empty-vector test failure-return issue is fixed; do not reassign it from historical notes.
+Text parsing, multi-hop compilation, and AND filters work through C++ functions and the CLI. A Python runner now executes prepared query pairs and checks independent expected rows. Model calls, token accounting, repairs, and the web interface are not implemented. Boolean syntax beyond AND-connected literal equalities remains unsupported. The old empty-vector test failure-return issue is fixed; do not reassign it from historical notes.
 
 Accepted text shape: `SELECT [DISTINCT] path [AS alias], ... FROM table [AS] alias [WHERE path = literal [AND path = literal ...]];`. The FROM alias and final semicolon are required; projection aliases require AS. A literal is a string or signed int64. Paths may follow finite chains, including repeated visits to a table. Every component before the terminal column must resolve to a declared reference. Extra statements, trailing non-comment input, OR, NOT, and parentheses are rejected.
 
@@ -71,14 +72,15 @@ make test
 make run
 ```
 
-Requirements are GNU Make 4.3+, a C++20-capable `g++`, and Bison 3.8+. `make` builds the path demo and `build/sqlpc`; `make run` still prints `w.author.name`. `make test` additionally requires Python 3 with its standard-library SQLite module. Run the relevant build/tests when changing implementation, and report what actually ran.
+Requirements are GNU Make 4.3+, a C++20-capable `g++`, and Bison 3.8+. `make` builds the path demo and `build/sqlpc`; `make run` still prints `w.author.name`. The prepared runner and full `make test` require Python 3.11+ with its standard-library SQLite module. Run relevant build/tests when changing implementation, and report what actually ran.
 
 ## Next compiler increment
 
 The object compiler, tokenizer, and Bison parser are implemented. Trace `tests/parser_test.cc` from SQLP text through `parse_query` and `compile_sqlp`. `Query.distinct` defaults to false; `std::optional` represents absent projection aliases; `SqlValue` preserves string/int64 types. `Query.where` is now a vector of `EqualityPredicate`, replacing the old optional single predicate; an empty vector omits WHERE. Conditions and parameters retain source order, and every term is validated. Tokens own their text and carry start/exclusive-end locations: zero-based byte offsets and one-based byte columns, with CRLF as one line break. Lexical failures propagate as `LexerError`; grammar failures use `ParseError`. Name/type errors still come from `compile_query` without source locations.
 
-1. Review the provisional CLI and trace format with Iris/Sam; connect the runner and path inspection using [COMPILER_CLI.md](COMPILER_CLI.md). The compiler does not execute SQL. Larger catalogs will need a file interface beyond the current argv limit.
-2. Select/review a workload and dataset, using the preflight and shared catalog format. Keep the tiny academic fixture in development; prepare independent answers for the real comparison.
+1. Review saved prepared-run records and path inspection with Iris/Sam. The compiler does not execute SQL; the Python runner does. Larger catalogs will need a compiler file interface beyond the current argv limit.
+2. Add a model adapter, corresponding language guides, provider-reported usage, and saved versions/settings once model access/budget is agreed. Never send prepared queries/gold rows to a model.
+3. Select/review a real workload and dataset, using the preflight and shared catalog format. Keep the tiny academic fixture in development and prepare independent answers for the real comparison.
 
 Lexer conventions: bare identifiers use ASCII letters/underscore followed by letters/digits/underscore; double quotes allow other identifier characters. Strings use single quotes; repeated delimiters escape a quote and backslashes are literal. Decimal int64 values may have an adjacent minus sign. Plus signs, fractional/exponent/hex forms, empty quoted identifiers, embedded NULs, and unterminated quotes/comments are rejected. Line comments (`--`) and non-nested block comments (`/* ... */`) are skipped. Lexical acceptance does not imply that syntax or semantics are supported.
 

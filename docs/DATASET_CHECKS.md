@@ -78,3 +78,5 @@ with closing(sqlite3.connect('file:build/academic.sqlite?mode=ro', uri=True)) as
 ```
 
 The duplicate result is intentional. Add DISTINCT only when the question requests distinct answers. [Compiler protocol](COMPILER_CLI.md) · [Project context](AGENTS.md).
+
+The [prepared comparison runner](QUERY_COMPARISON.md) uses this same fixture/catalog to execute both conditions, check duplicate-sensitive answers, and save records for the interface.
