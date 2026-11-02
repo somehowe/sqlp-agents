@@ -179,6 +179,46 @@ int main() {
                     revisit_result.sql.find("ON \"a_ref0\".\"mentor_aid\" = \"a_ref1\".\"aid\"") != std::string::npos,
                 "Finite paths revisiting the same table did not get distinct bindings");
 
+        // SQLite permits 64 table instances including the root binding.
+        std::vector<std::string> boundary_features(63, "mentor");
+        boundary_features.push_back("aid");
+        Query join_boundary{
+            "AUTHOR", "a", {{Path{"a", boundary_features}, std::nullopt}}, {}
+        };
+        const auto boundary_result = compile_query(join_boundary, catalog);
+        require(boundary_result.trace.joins.size() == 63 && join_count(boundary_result.sql) == 63,
+                "The SQLite join boundary was rejected or lost joins");
+        join_boundary.projections.assign(100, join_boundary.projections.front());
+        join_boundary.where.push_back({Path{"a", boundary_features}, std::int64_t{1}});
+        const auto shared_boundary = compile_query(join_boundary, catalog);
+        require(shared_boundary.trace.joins.size() == 63 && shared_boundary.trace.paths.size() == 101,
+                "Repeated path occurrences incorrectly consumed the SQLite join budget");
+        join_boundary.where.push_back({Path{"a", {"university", "country"}}, std::string{"CA"}});
+        require_invalid(join_boundary, catalog, "A separate branch exceeded the total SQLite join budget");
+        join_boundary.where.pop_back();
+        boundary_features.insert(boundary_features.begin(), "mentor");
+        join_boundary.projections.push_back({Path{"a", boundary_features}, std::nullopt});
+        require_invalid(join_boundary, catalog, "A 65th SQLite table instance was accepted");
+
+        Query projection_boundary{
+            "AUTHOR", "a", {{Path{"a", {"aid"}}, std::nullopt}}, {}
+        };
+        projection_boundary.projections.assign(2000, projection_boundary.projections.front());
+        require(compile_query(projection_boundary, catalog).trace.paths.size() == 2000,
+                "The SQLite projection boundary was rejected");
+        projection_boundary.projections.push_back(projection_boundary.projections.front());
+        require_invalid(projection_boundary, catalog, "More than 2000 projections were accepted");
+
+        Query predicate_boundary{
+            "AUTHOR", "a", {{Path{"a", {"aid"}}, std::nullopt}},
+            {{Path{"a", {"aid"}}, std::int64_t{1}}}
+        };
+        predicate_boundary.where.assign(512, predicate_boundary.where.front());
+        require(compile_query(predicate_boundary, catalog).parameters.size() == 512,
+                "The equality predicate boundary was rejected or lost parameters");
+        predicate_boundary.where.push_back(predicate_boundary.where.front());
+        require_invalid(predicate_boundary, catalog, "More than 512 equality predicates were accepted");
+
         Catalog dotted_role = catalog;
         dotted_role.tables[2].columns.push_back({"uni_uid", ColumnType::Integer});
         dotted_role.references.push_back({"WROTE", "author.university", "uni_uid", "UNIVERSITY", "uid"});

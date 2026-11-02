@@ -2,8 +2,9 @@ CXX := g++
 BISON := bison
 CPPFLAGS := -Isrc -Ibuild
 CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic -g
+SANITIZER_FLAGS := -O1 -D_GLIBCXX_ASSERTIONS -fsanitize=address,undefined -fno-omit-frame-pointer
 
-.PHONY: all run test clean
+.PHONY: all run test test-viewer test-sanitize clean
 
 all: build/sqlp_demo build/sqlpc
 
@@ -70,6 +71,39 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	@./build/lexer_test
 	@./build/parser_test
 	python3 tests/compiler_cli_test.py
+	python3 tests/compiler_catalog_test.py
+	python3 tests/dataset_check_test.py
+	python3 tests/schema_inspection_test.py
+	python3 tests/arm_mapping_test.py
+	python3 tests/chinook_test.py
+	python3 tests/comparison_test.py
+	python3 tests/model_provider_test.py
+	python3 tests/pilot_test.py
+	python3 tests/analysis_test.py
+	python3 tests/demo_test.py
+	python3 tests/experiment_kit_test.py
+	python3 tests/benchmark_test.py
+	python3 tests/natsql_test.py
+	python3 tests/differential_test.py
+
+test-viewer:
+	node tests/viewer_test.js
+
+build/compiler_fuzz_sanitize: tests/compiler_fuzz.cc src/parser.cc src/parser.h \
+				build/sqlp_parser.cc build/sqlp_parser.h src/lexer.cc src/lexer.h \
+				src/query.cc src/query.h src/sql.cc src/sql.h src/catalog.cc \
+				src/catalog.h src/mapping.cc src/mapping.h src/path.h Makefile
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(SANITIZER_FLAGS) tests/compiler_fuzz.cc \
+	src/parser.cc build/sqlp_parser.cc src/lexer.cc src/query.cc src/sql.cc \
+	src/catalog.cc src/mapping.cc -o $@
+
+build/lexer_test_sanitize: tests/lexer_test.cc src/lexer.cc src/lexer.h Makefile
+	mkdir -p build
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(SANITIZER_FLAGS) tests/lexer_test.cc src/lexer.cc -o $@
+
+test-sanitize: build/compiler_fuzz_sanitize build/lexer_test_sanitize
+	./build/lexer_test_sanitize
+	./build/compiler_fuzz_sanitize
 
 clean:
 	rm -rf build

@@ -115,6 +115,29 @@ int main() {
         original = "changed";
         require(owned.next().text == "owned_name", "Lexer borrowed mutable caller input");
 
+        // Exercise both short-string storage and a transferred heap allocation.
+        for (const auto &prefix : std::vector<std::string>{"a", std::string(1000, 'a')}) {
+            Lexer source{prefix + " tail last"};
+            const auto saved = source.next();
+            Lexer moved{std::move(source)};
+            require(source.next().kind == TokenKind::End,
+                    "Moved-from lexer did not end safely after move construction");
+            const auto continuation = moved.next();
+            require(continuation.text == "tail" &&
+                        continuation.location == SourceLocation{prefix.size() + 1, 1, prefix.size() + 2},
+                    "Move construction lost token continuation or source position");
+            Lexer assigned{"discard this"};
+            assigned = std::move(moved);
+            require(moved.next().kind == TokenKind::End,
+                    "Moved-from lexer did not end safely after move assignment");
+            require(assigned.next().text == "last" && assigned.next().kind == TokenKind::End &&
+                        saved.text == prefix,
+                    "Moving a lexer lost its remaining input or an already returned token");
+            source = Lexer{"reset"};
+            require(source.next().text == "reset" && source.next().kind == TokenKind::End,
+                    "Moved-from lexer could not be reassigned and reused");
+        }
+
         for (const auto &invalid : std::vector<std::string>{
                  "9223372036854775808", "-9223372036854775809", std::string(1000, '9'),
                  "12abc", "1.5", "1e3", "0x10", "+1", "-", "@", "!"}) {

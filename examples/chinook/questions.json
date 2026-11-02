@@ -1,0 +1,1165 @@
+{
+  "version": 1,
+  "purpose": "Project-authored bounded Chinook case study; independent human interpretation review pending; no model outcomes used to select tasks.",
+  "tasks": [
+    {
+      "id": "ch-dev-01",
+      "scope": "development",
+      "question": "List the first name, last name, and email of every customer whose country is Canada.",
+      "sqlp": "SELECT c.FirstName, c.LastName, c.Email FROM Customer c WHERE c.Country = 'Canada';",
+      "sql": "SELECT c.FirstName, c.LastName, c.Email FROM Customer c WHERE c.Country = 'Canada';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "FirstName",
+          "LastName",
+          "Email"
+        ],
+        "where": [
+          [
+            "Country",
+            "Canada"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "direct"
+      ]
+    },
+    {
+      "id": "ch-dev-02",
+      "scope": "development",
+      "question": "List album titles by the artist AC/DC, once per album.",
+      "sqlp": "SELECT a.Title FROM Album a WHERE a.artist.Name = 'AC/DC';",
+      "sql": "SELECT a.Title FROM Album a JOIN Artist r ON a.ArtistId = r.ArtistId WHERE r.Name = 'AC/DC';",
+      "oracle": {
+        "root": "Album",
+        "projections": [
+          "Title"
+        ],
+        "where": [
+          [
+            "artist.Name",
+            "AC/DC"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop"
+      ]
+    },
+    {
+      "id": "ch-dev-03",
+      "scope": "development",
+      "question": "List the track name and album title of each Iron Maiden track.",
+      "sqlp": "SELECT t.Name, t.album.Title FROM Track t WHERE t.album.artist.Name = 'Iron Maiden';",
+      "sql": "SELECT t.Name, a.Title FROM Track t JOIN Album a ON t.AlbumId = a.AlbumId JOIN Artist r ON a.ArtistId = r.ArtistId WHERE r.Name = 'Iron Maiden';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "Name",
+          "album.Title"
+        ],
+        "where": [
+          [
+            "album.artist.Name",
+            "Iron Maiden"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "shared-prefix"
+      ]
+    },
+    {
+      "id": "ch-dev-04",
+      "scope": "development",
+      "question": "For every invoice to a customer living in France, list its invoice ID and the customer first name and country.",
+      "sqlp": "SELECT i.InvoiceId, i.customer.FirstName, i.customer.Country FROM Invoice i WHERE i.customer.Country = 'France';",
+      "sql": "SELECT i.InvoiceId, c.FirstName, c.Country FROM Invoice i JOIN Customer c ON i.CustomerId = c.CustomerId WHERE c.Country = 'France';",
+      "oracle": {
+        "root": "Invoice",
+        "projections": [
+          "InvoiceId",
+          "customer.FirstName",
+          "customer.Country"
+        ],
+        "where": [
+          [
+            "customer.Country",
+            "France"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "shared-prefix"
+      ]
+    },
+    {
+      "id": "ch-dev-05",
+      "scope": "development",
+      "question": "List each Brazilian customer first name together with the first name of their assigned support representative.",
+      "sqlp": "SELECT c.FirstName, c.supportRep.FirstName FROM Customer c WHERE c.Country = 'Brazil';",
+      "sql": "SELECT c.FirstName, e.FirstName FROM Customer c JOIN Employee e ON c.SupportRepId = e.EmployeeId WHERE c.Country = 'Brazil';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "FirstName",
+          "supportRep.FirstName"
+        ],
+        "where": [
+          [
+            "Country",
+            "Brazil"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "relationship-role"
+      ]
+    },
+    {
+      "id": "ch-dev-06",
+      "scope": "development",
+      "question": "Which customer email addresses bought at least one track by Queen? Return each email once.",
+      "sqlp": "SELECT DISTINCT l.invoice.customer.Email FROM InvoiceLine l WHERE l.track.album.artist.Name = 'Queen';",
+      "sql": "SELECT DISTINCT c.Email FROM InvoiceLine l JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='Queen';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "invoice.customer.Email"
+        ],
+        "where": [
+          [
+            "track.album.artist.Name",
+            "Queen"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-dev-07",
+      "scope": "development",
+      "question": "List the track name for every Jazz purchase line. Keep a repeated name when the track was purchased more than once.",
+      "sqlp": "SELECT l.track.Name FROM InvoiceLine l WHERE l.track.genre.Name = 'Jazz';",
+      "sql": "SELECT t.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Genre g ON t.GenreId=g.GenreId WHERE g.Name='Jazz';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.Name"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Jazz"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "bag"
+      ]
+    },
+    {
+      "id": "ch-dev-08",
+      "scope": "development",
+      "question": "List each distinct album-title and artist-name pair that has a Classical track.",
+      "sqlp": "SELECT DISTINCT t.album.Title, t.album.artist.Name FROM Track t WHERE t.genre.Name = 'Classical';",
+      "sql": "SELECT DISTINCT a.Title, r.Name FROM Track t JOIN Genre g ON t.GenreId=g.GenreId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE g.Name='Classical';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "album.Title",
+          "album.artist.Name"
+        ],
+        "where": [
+          [
+            "genre.Name",
+            "Classical"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-dev-09",
+      "scope": "development",
+      "question": "List invoice IDs billed to the USA whose customer is supported by Jane Peacock.",
+      "sqlp": "SELECT i.InvoiceId FROM Invoice i WHERE i.BillingCountry = 'USA' AND i.customer.supportRep.FirstName = 'Jane' AND i.customer.supportRep.LastName = 'Peacock';",
+      "sql": "SELECT i.InvoiceId FROM Invoice i JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE i.BillingCountry='USA' AND e.FirstName='Jane' AND e.LastName='Peacock';",
+      "oracle": {
+        "root": "Invoice",
+        "projections": [
+          "InvoiceId"
+        ],
+        "where": [
+          [
+            "BillingCountry",
+            "USA"
+          ],
+          [
+            "customer.supportRep.FirstName",
+            "Jane"
+          ],
+          [
+            "customer.supportRep.LastName",
+            "Peacock"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "and",
+        "shared-prefix"
+      ]
+    },
+    {
+      "id": "ch-dev-10",
+      "scope": "development",
+      "question": "For each purchase line of a track from album ID 1, list the invoice ID, track name, and quantity.",
+      "sqlp": "SELECT l.InvoiceId, l.track.Name, l.Quantity FROM InvoiceLine l WHERE l.track.album.AlbumId = 1;",
+      "sql": "SELECT l.InvoiceId, t.Name, l.Quantity FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId WHERE a.AlbumId=1;",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "InvoiceId",
+          "track.Name",
+          "Quantity"
+        ],
+        "where": [
+          [
+            "track.album.AlbumId",
+            1
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "integer",
+        "bag"
+      ]
+    },
+    {
+      "id": "ch-dev-11",
+      "scope": "development",
+      "question": "List email addresses of customers living in the USA whose assigned support representative also lives in the USA.",
+      "sqlp": "SELECT c.Email FROM Customer c WHERE c.Country = 'USA' AND c.supportRep.Country = 'USA';",
+      "sql": "SELECT c.Email FROM Customer c JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE c.Country='USA' AND e.Country='USA';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "Email"
+        ],
+        "where": [
+          [
+            "Country",
+            "USA"
+          ],
+          [
+            "supportRep.Country",
+            "USA"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "empty",
+        "relationship-role"
+      ]
+    },
+    {
+      "id": "ch-dev-12",
+      "scope": "development",
+      "question": "List the track name and duration in milliseconds for Jazz tracks stored as MPEG audio file.",
+      "sqlp": "SELECT t.Name, t.Milliseconds FROM Track t WHERE t.genre.Name = 'Jazz' AND t.mediaType.Name = 'MPEG audio file';",
+      "sql": "SELECT t.Name, t.Milliseconds FROM Track t JOIN Genre g ON t.GenreId=g.GenreId JOIN MediaType m ON t.MediaTypeId=m.MediaTypeId WHERE g.Name='Jazz' AND m.Name='MPEG audio file';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "Name",
+          "Milliseconds"
+        ],
+        "where": [
+          [
+            "genre.Name",
+            "Jazz"
+          ],
+          [
+            "mediaType.Name",
+            "MPEG audio file"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "branching",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-01",
+      "scope": "held_out",
+      "question": "List the album ID and title for every album by Metallica.",
+      "sqlp": "SELECT a.AlbumId, a.Title FROM Album a WHERE a.artist.Name = 'Metallica';",
+      "sql": "SELECT a.AlbumId, a.Title FROM Album a JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='Metallica';",
+      "oracle": {
+        "root": "Album",
+        "projections": [
+          "AlbumId",
+          "Title"
+        ],
+        "where": [
+          [
+            "artist.Name",
+            "Metallica"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop"
+      ]
+    },
+    {
+      "id": "ch-hel-02",
+      "scope": "held_out",
+      "question": "List track IDs, names, and composers for tracks on the album Let There Be Rock.",
+      "sqlp": "SELECT t.TrackId, t.Name, t.Composer FROM Track t WHERE t.album.Title = 'Let There Be Rock';",
+      "sql": "SELECT t.TrackId, t.Name, t.Composer FROM Track t JOIN Album a ON t.AlbumId=a.AlbumId WHERE a.Title='Let There Be Rock';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "TrackId",
+          "Name",
+          "Composer"
+        ],
+        "where": [
+          [
+            "album.Title",
+            "Let There Be Rock"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "nullable-attribute"
+      ]
+    },
+    {
+      "id": "ch-hel-03",
+      "scope": "held_out",
+      "question": "Which genre names occur among Iron Maiden tracks? Return each genre name once.",
+      "sqlp": "SELECT DISTINCT t.genre.Name FROM Track t WHERE t.album.artist.Name = 'Iron Maiden';",
+      "sql": "SELECT DISTINCT g.Name FROM Track t JOIN Genre g ON t.GenreId=g.GenreId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='Iron Maiden';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "genre.Name"
+        ],
+        "where": [
+          [
+            "album.artist.Name",
+            "Iron Maiden"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-hel-04",
+      "scope": "held_out",
+      "question": "Which media format names are used by AC/DC tracks? Return each name once.",
+      "sqlp": "SELECT DISTINCT t.mediaType.Name FROM Track t WHERE t.album.artist.Name = 'AC/DC';",
+      "sql": "SELECT DISTINCT m.Name FROM Track t JOIN MediaType m ON t.MediaTypeId=m.MediaTypeId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='AC/DC';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "mediaType.Name"
+        ],
+        "where": [
+          [
+            "album.artist.Name",
+            "AC/DC"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-hel-05",
+      "scope": "held_out",
+      "question": "List the track name and media format for every Science Fiction track.",
+      "sqlp": "SELECT t.Name, t.mediaType.Name FROM Track t WHERE t.genre.Name = 'Science Fiction';",
+      "sql": "SELECT t.Name, m.Name FROM Track t JOIN MediaType m ON t.MediaTypeId=m.MediaTypeId JOIN Genre g ON t.GenreId=g.GenreId WHERE g.Name='Science Fiction';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "Name",
+          "mediaType.Name"
+        ],
+        "where": [
+          [
+            "genre.Name",
+            "Science Fiction"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "branching"
+      ]
+    },
+    {
+      "id": "ch-hel-06",
+      "scope": "held_out",
+      "question": "List the email and support-representative last name for each customer living in Denmark.",
+      "sqlp": "SELECT c.Email, c.supportRep.LastName FROM Customer c WHERE c.Country = 'Denmark';",
+      "sql": "SELECT c.Email, e.LastName FROM Customer c JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE c.Country='Denmark';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "Email",
+          "supportRep.LastName"
+        ],
+        "where": [
+          [
+            "Country",
+            "Denmark"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "relationship-role"
+      ]
+    },
+    {
+      "id": "ch-hel-07",
+      "scope": "held_out",
+      "question": "Which countries do customers assigned to Jane Peacock live in? Return each customer country once.",
+      "sqlp": "SELECT DISTINCT c.Country FROM Customer c WHERE c.supportRep.FirstName = 'Jane' AND c.supportRep.LastName = 'Peacock';",
+      "sql": "SELECT DISTINCT c.Country FROM Customer c JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE e.FirstName='Jane' AND e.LastName='Peacock';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "Country"
+        ],
+        "where": [
+          [
+            "supportRep.FirstName",
+            "Jane"
+          ],
+          [
+            "supportRep.LastName",
+            "Peacock"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "one-hop",
+        "relationship-role",
+        "distinct",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-08",
+      "scope": "held_out",
+      "question": "List the invoice ID, invoice date, and customer email for every invoice belonging to customer ID 1.",
+      "sqlp": "SELECT i.InvoiceId, i.InvoiceDate, i.customer.Email FROM Invoice i WHERE i.customer.CustomerId = 1;",
+      "sql": "SELECT i.InvoiceId, i.InvoiceDate, c.Email FROM Invoice i JOIN Customer c ON i.CustomerId=c.CustomerId WHERE c.CustomerId=1;",
+      "oracle": {
+        "root": "Invoice",
+        "projections": [
+          "InvoiceId",
+          "InvoiceDate",
+          "customer.Email"
+        ],
+        "where": [
+          [
+            "customer.CustomerId",
+            1
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "integer"
+      ]
+    },
+    {
+      "id": "ch-hel-09",
+      "scope": "held_out",
+      "question": "Which invoice IDs contain a purchase of a Metallica track? Return each invoice ID once.",
+      "sqlp": "SELECT DISTINCT l.invoice.InvoiceId FROM InvoiceLine l WHERE l.track.album.artist.Name = 'Metallica';",
+      "sql": "SELECT DISTINCT i.InvoiceId FROM InvoiceLine l JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='Metallica';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "invoice.InvoiceId"
+        ],
+        "where": [
+          [
+            "track.album.artist.Name",
+            "Metallica"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-hel-10",
+      "scope": "held_out",
+      "question": "For every purchase line by a customer living in Germany, list the line ID, track name, and artist name.",
+      "sqlp": "SELECT l.InvoiceLineId, l.track.Name, l.track.album.artist.Name FROM InvoiceLine l WHERE l.invoice.customer.Country = 'Germany';",
+      "sql": "SELECT l.InvoiceLineId, t.Name, r.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE c.Country='Germany';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "InvoiceLineId",
+          "track.Name",
+          "track.album.artist.Name"
+        ],
+        "where": [
+          [
+            "invoice.customer.Country",
+            "Germany"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "branching"
+      ]
+    },
+    {
+      "id": "ch-hel-11",
+      "scope": "held_out",
+      "question": "Which artist names were purchased by customers living in Canada? Return each artist name once.",
+      "sqlp": "SELECT DISTINCT l.track.album.artist.Name FROM InvoiceLine l WHERE l.invoice.customer.Country = 'Canada';",
+      "sql": "SELECT DISTINCT r.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE c.Country='Canada';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.album.artist.Name"
+        ],
+        "where": [
+          [
+            "invoice.customer.Country",
+            "Canada"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "distinct",
+        "paired-multiplicity"
+      ]
+    },
+    {
+      "id": "ch-hel-12",
+      "scope": "held_out",
+      "question": "For every purchase line by customers living in Canada, list the artist name. Keep repeated artist names for different purchase lines.",
+      "sqlp": "SELECT l.track.album.artist.Name FROM InvoiceLine l WHERE l.invoice.customer.Country = 'Canada';",
+      "sql": "SELECT r.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE c.Country='Canada';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.album.artist.Name"
+        ],
+        "where": [
+          [
+            "invoice.customer.Country",
+            "Canada"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "bag",
+        "paired-multiplicity"
+      ]
+    },
+    {
+      "id": "ch-hel-13",
+      "scope": "held_out",
+      "question": "Which album titles had a Rock track bought by a customer living in Brazil? Return each title once.",
+      "sqlp": "SELECT DISTINCT l.track.album.Title FROM InvoiceLine l WHERE l.track.genre.Name = 'Rock' AND l.invoice.customer.Country = 'Brazil';",
+      "sql": "SELECT DISTINCT a.Title FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Genre g ON t.GenreId=g.GenreId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE g.Name='Rock' AND c.Country='Brazil';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.album.Title"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Rock"
+          ],
+          [
+            "invoice.customer.Country",
+            "Brazil"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "and",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-hel-14",
+      "scope": "held_out",
+      "question": "For every Jazz purchase line, list the composer and album artist name. Preserve repeated pairs.",
+      "sqlp": "SELECT l.track.Composer, l.track.album.artist.Name FROM InvoiceLine l WHERE l.track.genre.Name = 'Jazz';",
+      "sql": "SELECT t.Composer, r.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Genre g ON t.GenreId=g.GenreId WHERE g.Name='Jazz';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.Composer",
+          "track.album.artist.Name"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Jazz"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "nullable-attribute",
+        "bag"
+      ]
+    },
+    {
+      "id": "ch-hel-15",
+      "scope": "held_out",
+      "question": "List the purchase-line ID and track name for Latin tracks bought by customers living in France.",
+      "sqlp": "SELECT l.InvoiceLineId, l.track.Name FROM InvoiceLine l WHERE l.track.genre.Name = 'Latin' AND l.invoice.customer.Country = 'France';",
+      "sql": "SELECT l.InvoiceLineId, t.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Genre g ON t.GenreId=g.GenreId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE g.Name='Latin' AND c.Country='France';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "InvoiceLineId",
+          "track.Name"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Latin"
+          ],
+          [
+            "invoice.customer.Country",
+            "France"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-16",
+      "scope": "held_out",
+      "question": "List the track name, customer email, and support representative email for every purchase line on invoice ID 1.",
+      "sqlp": "SELECT l.track.Name, l.invoice.customer.Email, l.invoice.customer.supportRep.Email FROM InvoiceLine l WHERE l.invoice.InvoiceId = 1;",
+      "sql": "SELECT t.Name, c.Email, e.Email FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE i.InvoiceId=1;",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.Name",
+          "invoice.customer.Email",
+          "invoice.customer.supportRep.Email"
+        ],
+        "where": [
+          [
+            "invoice.InvoiceId",
+            1
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "relationship-role",
+        "integer"
+      ]
+    },
+    {
+      "id": "ch-hel-17",
+      "scope": "held_out",
+      "question": "List invoice IDs and customer email addresses for invoices billed to Germany whose assigned support representative lives in Canada.",
+      "sqlp": "SELECT i.InvoiceId, i.customer.Email FROM Invoice i WHERE i.BillingCountry = 'Germany' AND i.customer.supportRep.Country = 'Canada';",
+      "sql": "SELECT i.InvoiceId, c.Email FROM Invoice i JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE i.BillingCountry='Germany' AND e.Country='Canada';",
+      "oracle": {
+        "root": "Invoice",
+        "projections": [
+          "InvoiceId",
+          "customer.Email"
+        ],
+        "where": [
+          [
+            "BillingCountry",
+            "Germany"
+          ],
+          [
+            "customer.supportRep.Country",
+            "Canada"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "and",
+        "relationship-role"
+      ]
+    },
+    {
+      "id": "ch-hel-18",
+      "scope": "held_out",
+      "question": "Which media-format and genre-name pairs occur on bought tracks by U2? Return each pair once.",
+      "sqlp": "SELECT DISTINCT l.track.mediaType.Name, l.track.genre.Name FROM InvoiceLine l WHERE l.track.album.artist.Name = 'U2';",
+      "sql": "SELECT DISTINCT m.Name, g.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN MediaType m ON t.MediaTypeId=m.MediaTypeId JOIN Genre g ON t.GenreId=g.GenreId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='U2';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.mediaType.Name",
+          "track.genre.Name"
+        ],
+        "where": [
+          [
+            "track.album.artist.Name",
+            "U2"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-hel-19",
+      "scope": "held_out",
+      "question": "For every purchase line supported by Margaret Park, list the line ID, the customer country, and the support representative country.",
+      "sqlp": "SELECT l.InvoiceLineId, l.invoice.customer.Country, l.invoice.customer.supportRep.Country FROM InvoiceLine l WHERE l.invoice.customer.supportRep.FirstName = 'Margaret' AND l.invoice.customer.supportRep.LastName = 'Park';",
+      "sql": "SELECT l.InvoiceLineId, c.Country, e.Country FROM InvoiceLine l JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE e.FirstName='Margaret' AND e.LastName='Park';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "InvoiceLineId",
+          "invoice.customer.Country",
+          "invoice.customer.supportRep.Country"
+        ],
+        "where": [
+          [
+            "invoice.customer.supportRep.FirstName",
+            "Margaret"
+          ],
+          [
+            "invoice.customer.supportRep.LastName",
+            "Park"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "relationship-role",
+        "shared-prefix",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-20",
+      "scope": "held_out",
+      "question": "List the track name and artist name for Rock tracks whose composer is Angus Young, Malcolm Young, Brian Johnson.",
+      "sqlp": "SELECT t.Name, t.album.artist.Name FROM Track t WHERE t.genre.Name = 'Rock' AND t.Composer = 'Angus Young, Malcolm Young, Brian Johnson';",
+      "sql": "SELECT t.Name, r.Name FROM Track t JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Genre g ON t.GenreId=g.GenreId WHERE g.Name='Rock' AND t.Composer='Angus Young, Malcolm Young, Brian Johnson';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "Name",
+          "album.artist.Name"
+        ],
+        "where": [
+          [
+            "genre.Name",
+            "Rock"
+          ],
+          [
+            "Composer",
+            "Angus Young, Malcolm Young, Brian Johnson"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-21",
+      "scope": "held_out",
+      "question": "List customer emails and their support representative first and last names for customers living in the city of Paris.",
+      "sqlp": "SELECT c.Email, c.supportRep.FirstName, c.supportRep.LastName FROM Customer c WHERE c.City = 'Paris';",
+      "sql": "SELECT c.Email, e.FirstName, e.LastName FROM Customer c JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE c.City='Paris';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "Email",
+          "supportRep.FirstName",
+          "supportRep.LastName"
+        ],
+        "where": [
+          [
+            "City",
+            "Paris"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "shared-prefix",
+        "relationship-role"
+      ]
+    },
+    {
+      "id": "ch-hel-22",
+      "scope": "held_out",
+      "question": "List track IDs and names for tracks stored as Protected MPEG-4 video file with genre TV Shows.",
+      "sqlp": "SELECT t.TrackId, t.Name FROM Track t WHERE t.mediaType.Name = 'Protected MPEG-4 video file' AND t.genre.Name = 'TV Shows';",
+      "sql": "SELECT t.TrackId, t.Name FROM Track t JOIN MediaType m ON t.MediaTypeId=m.MediaTypeId JOIN Genre g ON t.GenreId=g.GenreId WHERE m.Name='Protected MPEG-4 video file' AND g.Name='TV Shows';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "TrackId",
+          "Name"
+        ],
+        "where": [
+          [
+            "mediaType.Name",
+            "Protected MPEG-4 video file"
+          ],
+          [
+            "genre.Name",
+            "TV Shows"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "branching",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-23",
+      "scope": "held_out",
+      "question": "Which customer emails bought a Blues track whose album artist is Eric Clapton? Return each email once.",
+      "sqlp": "SELECT DISTINCT l.invoice.customer.Email FROM InvoiceLine l WHERE l.track.genre.Name = 'Blues' AND l.track.album.artist.Name = 'Eric Clapton';",
+      "sql": "SELECT DISTINCT c.Email FROM InvoiceLine l JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Track t ON l.TrackId=t.TrackId JOIN Genre g ON t.GenreId=g.GenreId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE g.Name='Blues' AND r.Name='Eric Clapton';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "invoice.customer.Email"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Blues"
+          ],
+          [
+            "track.album.artist.Name",
+            "Eric Clapton"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "and",
+        "distinct"
+      ]
+    },
+    {
+      "id": "ch-hel-24",
+      "scope": "held_out",
+      "question": "List the line ID and track name for AC/DC purchases by customers living in Argentina.",
+      "sqlp": "SELECT l.InvoiceLineId, l.track.Name FROM InvoiceLine l WHERE l.track.album.artist.Name = 'AC/DC' AND l.invoice.customer.Country = 'Argentina';",
+      "sql": "SELECT l.InvoiceLineId, t.Name FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE r.Name='AC/DC' AND c.Country='Argentina';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "InvoiceLineId",
+          "track.Name"
+        ],
+        "where": [
+          [
+            "track.album.artist.Name",
+            "AC/DC"
+          ],
+          [
+            "invoice.customer.Country",
+            "Argentina"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-25",
+      "scope": "held_out",
+      "question": "List invoice IDs for customers living in Brazil whose assigned support representative also lives in Brazil.",
+      "sqlp": "SELECT i.InvoiceId FROM Invoice i WHERE i.customer.Country = 'Brazil' AND i.customer.supportRep.Country = 'Brazil';",
+      "sql": "SELECT i.InvoiceId FROM Invoice i JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE c.Country='Brazil' AND e.Country='Brazil';",
+      "oracle": {
+        "root": "Invoice",
+        "projections": [
+          "InvoiceId"
+        ],
+        "where": [
+          [
+            "customer.Country",
+            "Brazil"
+          ],
+          [
+            "customer.supportRep.Country",
+            "Brazil"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "empty",
+        "relationship-role",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-26",
+      "scope": "held_out",
+      "question": "Which album titles by the artist Queen contain a Jazz track? Return each title once.",
+      "sqlp": "SELECT DISTINCT t.album.Title FROM Track t WHERE t.album.artist.Name = 'Queen' AND t.genre.Name = 'Jazz';",
+      "sql": "SELECT DISTINCT a.Title FROM Track t JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Genre g ON t.GenreId=g.GenreId WHERE r.Name='Queen' AND g.Name='Jazz';",
+      "oracle": {
+        "root": "Track",
+        "projections": [
+          "album.Title"
+        ],
+        "where": [
+          [
+            "album.artist.Name",
+            "Queen"
+          ],
+          [
+            "genre.Name",
+            "Jazz"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "two-hop",
+        "branching",
+        "and",
+        "empty"
+      ]
+    },
+    {
+      "id": "ch-hel-27",
+      "scope": "held_out",
+      "question": "List the track name and composer for every purchased Classical track. Keep duplicates from separate purchase lines.",
+      "sqlp": "SELECT l.track.Name, l.track.Composer FROM InvoiceLine l WHERE l.track.genre.Name = 'Classical';",
+      "sql": "SELECT t.Name, t.Composer FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Genre g ON t.GenreId=g.GenreId WHERE g.Name='Classical';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.Name",
+          "track.Composer"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Classical"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "two-hop",
+        "nullable-attribute",
+        "bag"
+      ]
+    },
+    {
+      "id": "ch-hel-28",
+      "scope": "held_out",
+      "question": "List customer first names and support-representative first names for customers assigned to Steve Johnson who live in the USA.",
+      "sqlp": "SELECT c.FirstName, c.supportRep.FirstName FROM Customer c WHERE c.Country = 'USA' AND c.supportRep.FirstName = 'Steve' AND c.supportRep.LastName = 'Johnson';",
+      "sql": "SELECT c.FirstName, e.FirstName FROM Customer c JOIN Employee e ON c.SupportRepId=e.EmployeeId WHERE c.Country='USA' AND e.FirstName='Steve' AND e.LastName='Johnson';",
+      "oracle": {
+        "root": "Customer",
+        "projections": [
+          "FirstName",
+          "supportRep.FirstName"
+        ],
+        "where": [
+          [
+            "Country",
+            "USA"
+          ],
+          [
+            "supportRep.FirstName",
+            "Steve"
+          ],
+          [
+            "supportRep.LastName",
+            "Johnson"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "one-hop",
+        "relationship-role",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-29",
+      "scope": "held_out",
+      "question": "For each Iron Maiden purchase line supported by Jane Peacock, list the invoice ID, track name, and customer country.",
+      "sqlp": "SELECT l.invoice.InvoiceId, l.track.Name, l.invoice.customer.Country FROM InvoiceLine l WHERE l.track.album.artist.Name = 'Iron Maiden' AND l.invoice.customer.supportRep.FirstName = 'Jane' AND l.invoice.customer.supportRep.LastName = 'Peacock';",
+      "sql": "SELECT i.InvoiceId, t.Name, c.Country FROM InvoiceLine l JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId JOIN Employee e ON c.SupportRepId=e.EmployeeId JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId WHERE r.Name='Iron Maiden' AND e.FirstName='Jane' AND e.LastName='Peacock';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "invoice.InvoiceId",
+          "track.Name",
+          "invoice.customer.Country"
+        ],
+        "where": [
+          [
+            "track.album.artist.Name",
+            "Iron Maiden"
+          ],
+          [
+            "invoice.customer.supportRep.FirstName",
+            "Jane"
+          ],
+          [
+            "invoice.customer.supportRep.LastName",
+            "Peacock"
+          ]
+        ],
+        "distinct": false
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "shared-prefix",
+        "and"
+      ]
+    },
+    {
+      "id": "ch-hel-30",
+      "scope": "held_out",
+      "question": "Which album-title, artist-name, and customer-country combinations occur on Metal purchases? Return each combination once.",
+      "sqlp": "SELECT DISTINCT l.track.album.Title, l.track.album.artist.Name, l.invoice.customer.Country FROM InvoiceLine l WHERE l.track.genre.Name = 'Metal';",
+      "sql": "SELECT DISTINCT a.Title, r.Name, c.Country FROM InvoiceLine l JOIN Track t ON l.TrackId=t.TrackId JOIN Album a ON t.AlbumId=a.AlbumId JOIN Artist r ON a.ArtistId=r.ArtistId JOIN Genre g ON t.GenreId=g.GenreId JOIN Invoice i ON l.InvoiceId=i.InvoiceId JOIN Customer c ON i.CustomerId=c.CustomerId WHERE g.Name='Metal';",
+      "oracle": {
+        "root": "InvoiceLine",
+        "projections": [
+          "track.album.Title",
+          "track.album.artist.Name",
+          "invoice.customer.Country"
+        ],
+        "where": [
+          [
+            "track.genre.Name",
+            "Metal"
+          ]
+        ],
+        "distinct": true
+      },
+      "tags": [
+        "three-hop",
+        "branching",
+        "distinct"
+      ]
+    }
+  ]
+}

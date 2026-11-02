@@ -1,12 +1,15 @@
 #include "parser.h"
 
+#include <array>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <optional>
 #include <set>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -15,6 +18,7 @@ constexpr std::string_view help =
     "  --column TABLE COLUMN integer|string unique|nonunique   (repeatable)\n"
     "  --reference SOURCE_TABLE ROLE SOURCE_COLUMN TARGET_TABLE TARGET_COLUMN\n"
     "                                                        (repeatable)\n"
+    "  --catalog-args-file FILE                              (instead of flags)\n"
     "  --help                                                (alone)\n"
     "Reads one SQLP query from stdin and writes one version-1 JSON response.\n"
     "Integer parameter values are decimal strings to preserve all int64 bits.\n";
@@ -43,6 +47,50 @@ bool valid_utf8(std::string_view text) {
         i += count;
     }
     return true;
+}
+
+// A response file transports the existing argv tokens without depending on the
+// operating system's argv limit. NUL delimiters preserve spaces/newlines in
+// quoted identifiers and require no second escaping language.
+std::vector<std::string> read_catalog_argument_file(const std::string &path) {
+    constexpr std::string_view header = "SQLP-CATALOG-ARGS-1\n";
+    constexpr std::size_t max_bytes = 16 * 1024 * 1024, max_tokens = 100000;
+    std::ifstream input{path, std::ios::binary};
+    if (!input) throw std::invalid_argument{"Could not open catalog argument file"};
+    std::string contents;
+    std::array<char, 8192> buffer;
+    for (;;) {
+        input.read(buffer.data(), buffer.size());
+        const auto count = static_cast<std::size_t>(input.gcount());
+        if (count > max_bytes - contents.size()) {
+            throw std::invalid_argument{"Catalog argument file exceeds 16 MiB"};
+        }
+        contents.append(buffer.data(), count);
+        if (input.bad() || (!input.eof() && input.fail())) {
+            throw std::invalid_argument{"Could not read catalog argument file"};
+        }
+        if (input.eof()) break;
+    }
+    if (!contents.starts_with(header)) {
+        throw std::invalid_argument{"Catalog argument file needs SQLP-CATALOG-ARGS-1 header"};
+    }
+    std::vector<std::string> arguments;
+    for (std::size_t offset = header.size(); offset < contents.size();) {
+        const auto end = contents.find('\0', offset);
+        if (end == std::string::npos) {
+            throw std::invalid_argument{"Catalog argument file has an unterminated token"};
+        }
+        if (arguments.size() == max_tokens) {
+            throw std::invalid_argument{"Catalog argument file exceeds 100000 tokens"};
+        }
+        const std::string_view token{contents.data() + offset, end - offset};
+        if (!valid_utf8(token)) {
+            throw std::invalid_argument{"Catalog argument tokens must be valid UTF-8"};
+        }
+        arguments.emplace_back(token);
+        offset = end + 1;
+    }
+    return arguments;
 }
 
 void json_string(std::string_view value) {
@@ -148,16 +196,16 @@ std::string folded(std::string name) {
     return name;
 }
 
-Catalog read_arguments(int argc, char **argv) {
+Catalog read_arguments(const std::vector<std::string> &arguments) {
     Catalog catalog;
-    for (int i = 1; i < argc;) {
-        const std::string_view option{argv[i++]};
-        const int fields = option == "--column" ? 4 : option == "--reference" ? 5 : 0;
+    for (std::size_t i = 0; i < arguments.size();) {
+        const std::string_view option{arguments[i++]};
+        const std::size_t fields = option == "--column" ? 4 : option == "--reference" ? 5 : 0;
         if (fields == 0) throw std::invalid_argument{"Unknown option; use --help for usage"};
-        if (argc - i < fields) throw std::invalid_argument{"Missing fields for " + std::string{option}};
+        if (arguments.size() - i < fields) throw std::invalid_argument{"Missing fields for " + std::string{option}};
         if (option == "--column") {
-            const std::string table{argv[i]}, column{argv[i + 1]};
-            const std::string_view type{argv[i + 2]}, uniqueness{argv[i + 3]};
+            const std::string &table{arguments[i]}, &column{arguments[i + 1]};
+            const std::string_view type{arguments[i + 2]}, uniqueness{arguments[i + 3]};
             if (type != "integer" && type != "string") {
                 throw std::invalid_argument{"Column type must be integer or string"};
             }
@@ -173,7 +221,7 @@ Catalog read_arguments(int argc, char **argv) {
             table_it->columns.push_back({column, type == "integer" ? ColumnType::Integer : ColumnType::String,
                                          uniqueness == "unique"});
         } else {
-            catalog.references.push_back({argv[i], argv[i + 1], argv[i + 2], argv[i + 3], argv[i + 4]});
+            catalog.references.push_back({arguments[i], arguments[i + 1], arguments[i + 2], arguments[i + 3], arguments[i + 4]});
         }
         i += fields;
     }
@@ -215,10 +263,18 @@ int main(int argc, char **argv) {
     }
     std::string stage{"arguments"};
     try {
+        std::vector<std::string> arguments;
         for (int i = 1; i < argc; ++i) {
             if (!valid_utf8(argv[i])) throw std::invalid_argument{"Arguments must be valid UTF-8"};
+            arguments.emplace_back(argv[i]);
         }
-        const auto catalog = read_arguments(argc, argv);
+        if (!arguments.empty() && arguments.front() == "--catalog-args-file") {
+            if (arguments.size() != 2) {
+                throw std::invalid_argument{"Use --catalog-args-file FILE instead of inline catalog flags"};
+            }
+            arguments = read_catalog_argument_file(arguments[1]);
+        }
+        const auto catalog = read_arguments(arguments);
         stage = "catalog";
         validate_catalog(catalog);
         stage = "input";

@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "entities": [
+    {"name": "UNIVERSITY", "source_table": "uni_directory", "key": "uid", "columns": [
+      {"name": "uid", "source_column": "institution_key"},
+      {"name": "name", "source_column": "institution_label"},
+      {"name": "country", "source_column": "nation_code"}
+    ], "references": []},
+    {"name": "AUTHOR", "source_table": "researcher_rows", "key": "aid", "columns": [
+      {"name": "aid", "source_column": "person_key"},
+      {"name": "name", "source_column": "display_name"},
+      {"name": "uni_id", "source_column": "institution_key"},
+      {"name": "mentor_aid", "source_column": "mentor_key"}
+    ], "references": [
+      {"feature": "university", "source_column": "uni_id", "target_entity": "UNIVERSITY"},
+      {"feature": "mentor", "source_column": "mentor_aid", "target_entity": "AUTHOR"}
+    ]},
+    {"name": "PAPER", "source_table": "publication_rows", "key": "pid", "columns": [
+      {"name": "pid", "source_column": "publication_key"},
+      {"name": "title", "source_column": "heading"},
+      {"name": "publisher_uid", "source_column": "publisher_key"}
+    ], "references": [
+      {"feature": "publisher", "source_column": "publisher_uid", "target_entity": "UNIVERSITY"}
+    ]},
+    {"name": "WROTE", "source_table": "authorship_events", "key": "wid", "columns": [
+      {"name": "wid", "source_column": "event_key"},
+      {"name": "author_aid", "source_column": "person_key"},
+      {"name": "paper_pid", "source_column": "publication_key"}
+    ], "references": [
+      {"feature": "author", "source_column": "author_aid", "target_entity": "AUTHOR"},
+      {"feature": "paper", "source_column": "paper_pid", "target_entity": "PAPER"}
+    ]}
+  ]
+}
