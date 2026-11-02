@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "entities": [
+    {
+      "name": "ARM_Artist",
+      "source_table": "Artist",
+      "key": "ArtistId",
+      "columns": [
+        {
+          "name": "ArtistId",
+          "source_column": "ArtistId"
+        },
+        {
+          "name": "Name",
+          "source_column": "Name"
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "ARM_Album",
+      "source_table": "Album",
+      "key": "AlbumId",
+      "columns": [
+        {
+          "name": "AlbumId",
+          "source_column": "AlbumId"
+        },
+        {
+          "name": "Title",
+          "source_column": "Title"
+        },
+        {
+          "name": "ArtistId",
+          "source_column": "ArtistId"
+        }
+      ],
+      "references": [
+        {
+          "feature": "artist",
+          "source_column": "ArtistId",
+          "target_entity": "ARM_Artist"
+        }
+      ]
+    },
+    {
+      "name": "ARM_Employee",
+      "source_table": "Employee",
+      "key": "EmployeeId",
+      "columns": [
+        {
+          "name": "EmployeeId",
+          "source_column": "EmployeeId"
+        },
+        {
+          "name": "FirstName",
+          "source_column": "FirstName"
+        },
+        {
+          "name": "LastName",
+          "source_column": "LastName"
+        },
+        {
+          "name": "Title",
+          "source_column": "Title"
+        },
+        {
+          "name": "City",
+          "source_column": "City"
+        },
+        {
+          "name": "Country",
+          "source_column": "Country"
+        },
+        {
+          "name": "Email",
+          "source_column": "Email"
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "ARM_Customer",
+      "source_table": "Customer",
+      "key": "CustomerId",
+      "columns": [
+        {
+          "name": "CustomerId",
+          "source_column": "CustomerId"
+        },
+        {
+          "name": "FirstName",
+          "source_column": "FirstName"
+        },
+        {
+          "name": "LastName",
+          "source_column": "LastName"
+        },
+        {
+          "name": "City",
+          "source_column": "City"
+        },
+        {
+          "name": "Country",
+          "source_column": "Country"
+        },
+        {
+          "name": "Email",
+          "source_column": "Email"
+        },
+        {
+          "name": "SupportRepId",
+          "source_column": "SupportRepId"
+        }
+      ],
+      "references": [
+        {
+          "feature": "supportRep",
+          "source_column": "SupportRepId",
+          "target_entity": "ARM_Employee"
+        }
+      ]
+    },
+    {
+      "name": "ARM_Genre",
+      "source_table": "Genre",
+      "key": "GenreId",
+      "columns": [
+        {
+          "name": "GenreId",
+          "source_column": "GenreId"
+        },
+        {
+          "name": "Name",
+          "source_column": "Name"
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "ARM_MediaType",
+      "source_table": "MediaType",
+      "key": "MediaTypeId",
+      "columns": [
+        {
+          "name": "MediaTypeId",
+          "source_column": "MediaTypeId"
+        },
+        {
+          "name": "Name",
+          "source_column": "Name"
+        }
+      ],
+      "references": []
+    },
+    {
+      "name": "ARM_Track",
+      "source_table": "Track",
+      "key": "TrackId",
+      "columns": [
+        {
+          "name": "TrackId",
+          "source_column": "TrackId"
+        },
+        {
+          "name": "Name",
+          "source_column": "Name"
+        },
+        {
+          "name": "AlbumId",
+          "source_column": "AlbumId"
+        },
+        {
+          "name": "MediaTypeId",
+          "source_column": "MediaTypeId"
+        },
+        {
+          "name": "GenreId",
+          "source_column": "GenreId"
+        },
+        {
+          "name": "Composer",
+          "source_column": "Composer"
+        },
+        {
+          "name": "Milliseconds",
+          "source_column": "Milliseconds"
+        }
+      ],
+      "references": [
+        {
+          "feature": "album",
+          "source_column": "AlbumId",
+          "target_entity": "ARM_Album"
+        },
+        {
+          "feature": "genre",
+          "source_column": "GenreId",
+          "target_entity": "ARM_Genre"
+        },
+        {
+          "feature": "mediaType",
+          "source_column": "MediaTypeId",
+          "target_entity": "ARM_MediaType"
+        }
+      ]
+    },
+    {
+      "name": "ARM_Invoice",
+      "source_table": "Invoice",
+      "key": "InvoiceId",
+      "columns": [
+        {
+          "name": "InvoiceId",
+          "source_column": "InvoiceId"
+        },
+        {
+          "name": "CustomerId",
+          "source_column": "CustomerId"
+        },
+        {
+          "name": "InvoiceDate",
+          "source_column": "InvoiceDate"
+        },
+        {
+          "name": "BillingCity",
+          "source_column": "BillingCity"
+        },
+        {
+          "name": "BillingCountry",
+          "source_column": "BillingCountry"
+        }
+      ],
+      "references": [
+        {
+          "feature": "customer",
+          "source_column": "CustomerId",
+          "target_entity": "ARM_Customer"
+        }
+      ]
+    },
+    {
+      "name": "ARM_InvoiceLine",
+      "source_table": "InvoiceLine",
+      "key": "InvoiceLineId",
+      "columns": [
+        {
+          "name": "InvoiceLineId",
+          "source_column": "InvoiceLineId"
+        },
+        {
+          "name": "InvoiceId",
+          "source_column": "InvoiceId"
+        },
+        {
+          "name": "TrackId",
+          "source_column": "TrackId"
+        },
+        {
+          "name": "Quantity",
+          "source_column": "Quantity"
+        }
+      ],
+      "references": [
+        {
+          "feature": "invoice",
+          "source_column": "InvoiceId",
+          "target_entity": "ARM_Invoice"
+        },
+        {
+          "feature": "track",
+          "source_column": "TrackId",
+          "target_entity": "ARM_Track"
+        }
+      ]
+    }
+  ]
+}

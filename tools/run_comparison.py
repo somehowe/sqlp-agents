@@ -1,4 +1,4 @@
-"""Run hand-written SQL/SQLP development pairs against one SQLite snapshot."""
+"""Validate prepared SQL/SQLP pairs against one SQLite snapshot; no model calls."""
 
 import argparse
 from collections import Counter
@@ -12,7 +12,9 @@ import subprocess
 import sys
 import time
 
-from .validate_dataset import _unique_object, compiler_arguments, load_catalog, validate_dataset
+from .compiler_catalog import catalog_argument_file
+from .validate_dataset import (PreflightTimeoutError, _unique_object, compiler_arguments,
+                               load_catalog, validate_dataset)
 
 
 DEFAULT_COMPILER = Path(__file__).resolve().parents[1] / "build" / "sqlpc"
@@ -39,8 +41,8 @@ def _text(value):
 
 def _check_workload(workload, max_rows):
     if (not isinstance(workload, dict) or type(workload.get("version")) is not int or
-            workload["version"] != 1 or workload.get("scope") != "development"):
-        raise ValueError("Expected a version-1 development workload")
+            workload["version"] != 1 or workload.get("scope") not in ("development", "held_out")):
+        raise ValueError("Expected a version-1 development or held_out workload")
     cases = workload.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("Workload needs a nonempty cases list")
@@ -155,6 +157,11 @@ def _execute(connection, sql, parameters, max_rows, timeout):
     connection.set_authorizer(_read_only)
     connection.set_progress_handler(progress, 1000)
     try:
+        # Python may raise DataError without sqlite_errorcode for an oversized
+        # SQL string. Detect the byte limit explicitly so compiler-produced SQL
+        # receives the same resource-limit result as directly generated SQL.
+        if len(sql.encode("utf-8")) > connection.getlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH):
+            raise QueryError("size_limit", "Query exceeded the SQLite SQL byte limit")
         cursor = connection.execute(sql, parameters)
         if cursor.description is None:
             raise QueryError("sqlite", "Query did not return columns")
@@ -167,6 +174,8 @@ def _execute(connection, sql, parameters, max_rows, timeout):
             code = "timeout"
         elif getattr(error, "sqlite_errorcode", None) == sqlite3.SQLITE_TOOBIG:
             code = "size_limit"
+        elif isinstance(error, UnicodeError) or str(error).startswith("Could not decode to UTF-8"):
+            code = "text_decoding"
         else:
             code = "sqlite"
         raise QueryError(code, str(error)) from error
@@ -192,6 +201,11 @@ def _condition(connection, case, language, arguments, compiler, max_rows, timeou
     try:
         columns, rows = _execute(connection, record["sql"], parameters, max_rows, timeout)
     except QueryError as error:
+        if language == "sqlp" and error.code == "text_decoding":
+            # This compiler profile only projects supplied fields and binds
+            # validated literals. A residual decode failure is data trouble,
+            # whereas arbitrary SQL can itself construct malformed TEXT.
+            raise SetupError("database", "Could not decode SQLP query results: " + str(error)) from error
         if language == "sqlp" and error.code == "sqlite":
             raise SetupError("compiled_sql", "Compiler-produced SQL failed to execute: " + str(error)) from error
         record["error"] = {"stage": "execute", "code": error.code, "message": str(error)}
@@ -202,12 +216,16 @@ def _condition(connection, case, language, arguments, compiler, max_rows, timeou
     return record
 
 
-def run_comparison(database_path, catalog, workload, compiler_path=DEFAULT_COMPILER, *, max_rows=1000, timeout_seconds=5.0):
+def run_comparison(database_path, catalog, workload, compiler_path=DEFAULT_COMPILER, *,
+                   max_rows=1000, timeout_seconds=5.0, preflight_timeout_seconds=30.0):
     try:
         if type(max_rows) is not int or not 1 <= max_rows < sys.maxsize:
             raise ValueError("max_rows must be a positive integer below sys.maxsize")
         if type(timeout_seconds) not in (int, float) or not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be finite and positive")
+        if (type(preflight_timeout_seconds) not in (int, float) or
+                not math.isfinite(preflight_timeout_seconds) or preflight_timeout_seconds <= 0):
+            raise ValueError("preflight_timeout_seconds must be finite and positive")
         _check_workload(workload, max_rows)
     except (ValueError, OverflowError) as error:
         raise SetupError("workload", str(error)) from error
@@ -220,14 +238,16 @@ def run_comparison(database_path, catalog, workload, compiler_path=DEFAULT_COMPI
         raise SetupError("compiler", "Compiler executable unavailable; run make first")
     if not hasattr(sqlite3.Connection, "setlimit"):
         raise SetupError("database", "Comparison runner requires Python 3.11 or newer")
-    result = {"version": 1, "ok": True, "origin": "manual", "scope": "development",
-              "limits": {"max_rows": max_rows, "timeout_seconds": timeout_seconds, "sqlite_bytes": SQLITE_BYTES},
+    result = {"version": 1, "ok": True, "origin": "manual", "scope": workload["scope"],
+              "limits": {"max_rows": max_rows, "timeout_seconds": timeout_seconds,
+                         "preflight_timeout_seconds": preflight_timeout_seconds, "sqlite_bytes": SQLITE_BYTES},
               "cases": []}
     try:
         uri = Path(database_path).resolve().as_uri() + "?mode=ro"
-        with closing(sqlite3.connect(uri, uri=True, cached_statements=0)) as connection:
+        with catalog_argument_file(catalog) as arguments, closing(
+                sqlite3.connect(uri, uri=True, cached_statements=0)) as connection:
             connection.execute("BEGIN")
-            preflight = validate_dataset(connection, catalog)
+            preflight = validate_dataset(connection, catalog, timeout_seconds=preflight_timeout_seconds)
             if not preflight["ok"]:
                 raise SetupError("preflight", "Dataset failed preflight", preflight)
             result["preflight"] = preflight
@@ -243,6 +263,14 @@ def run_comparison(database_path, catalog, workload, compiler_path=DEFAULT_COMPI
                                         "column_count": case["column_count"],
                                         "expected_rows": _rows(case["expected_rows"]), "runs": runs})
                 result["ok"] = result["ok"] and all(run["correct"] for run in runs)
+    except ValueError as error:
+        if isinstance(error, SetupError):
+            raise
+        raise SetupError("catalog", str(error)) from error
+    except PreflightTimeoutError as error:
+        raise SetupError("preflight_timeout", str(error)) from error
+    except OSError as error:
+        raise SetupError("catalog", str(error)) from error
     except sqlite3.Error as error:
         raise SetupError("database", str(error)) from error
     return result
@@ -256,6 +284,8 @@ def main():
     parser.add_argument("--compiler", type=Path, default=DEFAULT_COMPILER)
     parser.add_argument("--max-rows", type=int, default=1000)
     parser.add_argument("--timeout", type=float, default=5.0)
+    parser.add_argument("--preflight-timeout", type=float, default=30.0,
+                        help="separate dataset preflight budget in seconds (default: 30)")
     args = parser.parse_args()
     stage = "catalog"
     try:
@@ -263,7 +293,8 @@ def main():
         stage = "workload"
         workload = json.loads(args.workload.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
         report = run_comparison(args.database, catalog, workload, args.compiler,
-                                max_rows=args.max_rows, timeout_seconds=args.timeout)
+                                max_rows=args.max_rows, timeout_seconds=args.timeout,
+                                preflight_timeout_seconds=args.preflight_timeout)
     except (OSError, ValueError) as error:
         diagnostic = {"stage": getattr(error, "stage", stage), "message": str(error)}
         if isinstance(error, SetupError) and error.details is not None:

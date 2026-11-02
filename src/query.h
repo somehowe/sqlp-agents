@@ -14,6 +14,14 @@
 
 using SqlValue = std::variant<std::int64_t, std::string>;
 
+// Fixed prototype profile, keeping generated queries within SQLite's normal
+// table, result-column, and expression-depth limits. Runtime limits may be lower.
+namespace sqlp {
+inline constexpr std::size_t max_reference_joins = 63;
+inline constexpr std::size_t max_projections = 2000;
+inline constexpr std::size_t max_predicates = 512;
+}
+
 struct Projection {
     Path path;
     std::optional<std::string> alias;
@@ -67,6 +75,8 @@ struct CompiledQuery {
 // Supports direct columns and finite multi-hop reference paths. Literal values
 // are bound separately; invalid names, reference metadata, and type errors throw
 // std::invalid_argument. Catalog declarations do not validate actual rows.
+// The SQLite profile permits at most 63 distinct generated joins (shared paths
+// reuse them), 2000 projections, and 512 equality predicates.
 CompiledQuery compile_query(const Query &query, const Catalog &catalog);
 
 #endif

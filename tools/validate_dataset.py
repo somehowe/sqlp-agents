@@ -3,12 +3,18 @@
 import argparse
 from contextlib import closing
 import json
+import math
 from pathlib import Path
 import sqlite3
+import time
 
 
 _ASCII_FOLD = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")
 _REFERENCE_FIELDS = ("source_table", "feature", "source_column", "target_table", "target_column")
+
+
+class PreflightTimeoutError(TimeoutError):
+    """The separately budgeted dataset inspection did not finish in time."""
 
 
 def _name(value):
@@ -97,6 +103,9 @@ def _quoted(name):
 
 def _inspect_rows(connection, catalog):
     issues, available = [], set()
+    # CAST(text AS BLOB) returns bytes in the database's encoding. Inspect those
+    # bytes without asking Python's SQLite adapter to decode malformed text.
+    encoding = connection.execute("PRAGMA main.encoding").fetchone()[0]
 
     def issue(code, count, **details):
         if count:
@@ -128,6 +137,16 @@ def _inspect_rows(connection, catalog):
                 f"SELECT COUNT(*) FROM {sql_table} AS s "
                 f"WHERE {sql_column} IS NOT NULL AND typeof({sql_column}) != ?", (expected,)).fetchone()[0]
             issue("invalid_type", invalid, table=name, column=field)
+            if column["type"] == "string":
+                invalid_text = 0
+                for (raw,) in connection.execute(
+                        f"SELECT CAST({sql_column} AS BLOB) FROM {sql_table} AS s "
+                        f"WHERE typeof({sql_column}) = 'text'"):
+                    try:
+                        raw.decode(encoding, errors="strict")
+                    except UnicodeDecodeError:
+                        invalid_text += 1
+                issue("invalid_text_encoding", invalid_text, table=name, column=field)
             if column["unique"]:
                 nulls = connection.execute(
                     f"SELECT COUNT(*) FROM {sql_table} AS s WHERE {sql_column} IS NULL").fetchone()[0]
@@ -159,15 +178,45 @@ def _inspect_rows(connection, catalog):
     return {"version": 1, "ok": not issues, "issues": issues}
 
 
-def validate_dataset(connection, catalog):
-    """Check one read snapshot; preserve any transaction already owned by the caller."""
+def validate_dataset(connection, catalog, *, timeout_seconds=None):
+    """Check one snapshot and preserve any transaction already owned by the caller.
+
+    With no timeout, an existing SQLite progress handler is left untouched.
+    An explicit timeout owns the progress-handler slot for this call and clears
+    it afterwards; callers using that option must supply a connection without
+    their own handler. Python's SQLite API cannot retrieve a previous handler.
+    """
     _validate_catalog(catalog)
+    if timeout_seconds is not None:
+        try:
+            valid_timeout = (type(timeout_seconds) in (int, float) and
+                             math.isfinite(timeout_seconds) and timeout_seconds > 0)
+        except OverflowError:
+            valid_timeout = False
+        if not valid_timeout:
+            raise ValueError("Preflight timeout_seconds must be finite and positive")
+        deadline = time.monotonic() + timeout_seconds
+    expired = False
+
+    def progress():
+        nonlocal expired
+        expired = time.monotonic() >= deadline
+        return int(expired)
+
     owned_transaction = not connection.in_transaction
-    if owned_transaction:
-        connection.execute("BEGIN")
+    if timeout_seconds is not None:
+        connection.set_progress_handler(progress, 1000)
     try:
+        if owned_transaction:
+            connection.execute("BEGIN")
         return _inspect_rows(connection, catalog)
+    except sqlite3.Error as error:
+        if expired:
+            raise PreflightTimeoutError("Dataset preflight exceeded timeout_seconds") from error
+        raise
     finally:
+        if timeout_seconds is not None:
+            connection.set_progress_handler(None, 0)
         if owned_transaction and connection.in_transaction:
             connection.execute("ROLLBACK")
 
@@ -176,6 +225,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("database", type=Path)
     parser.add_argument("catalog", type=Path)
+    parser.add_argument("--timeout", type=float, default=30.0,
+                        help="separate dataset preflight budget in seconds (default: 30)")
     arguments = parser.parse_args()
     stage = "catalog"
     try:
@@ -183,8 +234,10 @@ def main():
         stage = "database"
         uri = arguments.database.resolve().as_uri() + "?mode=ro"
         with closing(sqlite3.connect(uri, uri=True)) as connection:
-            report = validate_dataset(connection, catalog)
-    except (OSError, ValueError, sqlite3.Error) as error:
+            report = validate_dataset(connection, catalog, timeout_seconds=arguments.timeout)
+    except (OSError, ValueError, sqlite3.Error, PreflightTimeoutError) as error:
+        if isinstance(error, PreflightTimeoutError):
+            stage = "preflight_timeout"
         print(json.dumps({"version": 1, "ok": False, "error": {"stage": stage, "message": str(error)}}))
         return 2
     print(json.dumps(report))

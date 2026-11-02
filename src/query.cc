@@ -43,6 +43,15 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
     if (query.projections.empty()) {
         throw std::invalid_argument{"A query needs at least one projection"};
     }
+    if (query.projections.size() > sqlp::max_projections) {
+        throw std::invalid_argument{
+            "SQLite query profile supports at most " + std::to_string(sqlp::max_projections) + " projections"};
+    }
+    if (query.where.size() > sqlp::max_predicates) {
+        throw std::invalid_argument{
+            "SQLite query profile supports at most " + std::to_string(sqlp::max_predicates) +
+            " equality predicates"};
+    }
 
     const std::string source_table = quote_identifier(query.source_table);
     const std::string source_alias = quote_identifier(query.source_alias);
@@ -86,6 +95,11 @@ CompiledQuery compile_query(const Query &query, const Catalog &catalog) {
                 }
             }
             if (join_id == joins.size()) {
+                if (joins.size() >= sqlp::max_reference_joins) {
+                    throw std::invalid_argument{
+                        "SQLite query profile supports at most " + std::to_string(sqlp::max_reference_joins) +
+                        " reference joins (64 table instances)"};
+                }
                 // A suffix on the root cannot collide with it, even ignoring ASCII case.
                 target_alias = query.source_alias + "_ref" + std::to_string(joins.size());
                 joins.push_back({feature, current_table, {mapping.target_table,

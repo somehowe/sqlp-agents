@@ -1,24 +1,27 @@
-# Ryan's schedule — C++ compiler
+# Ryan's schedule
 
-Build the C++ SQLP-to-SQL compiler. It returns SQL, parameters, path mappings, or useful errors; SQLite executes the SQL. The current code has one-hop helpers, not a complete compiler.
+Updated November 2, 2026. Budget 12–15 hours a week. The core compiler, runner,
+viewer, restricted ARM mappings, and offline workload now work. I should spend
+my next block understanding and reviewing them rather than rebuilding them.
 
-**Current course proposal:** draft the opening/problem and SQLP motivation by Canvas's actual deadline, separately from the project dates below.
-
-| Due | Deliverable |
+| Due, 2026 | What I should have done |
 |---|---|
-| **Wed Oct 28** | Agree on catalog/compiler formats. Trace Test 10 and sketch the query AST. |
-| **Sat Oct 31** | Implement `compile_query` from query objects, returning SQL and separate parameters. Check invalid names, filters, and reused joins. Execute one example with Iris and check the dataset's reference assumptions. |
-| **Wed Nov 4** | Hand Iris a minimal tokenizer/parser and callable CLI: one real SQLP text query plus catalog produces SQL/parameters or an error. Bison should build the same AST. |
-| **Sat Nov 7** | Finish multi-hop paths, generated aliases, shared joins, and basic checks. Supply Sam a path-to-join record. Freeze and document the evaluated language subset. |
-| **Mon Nov 9** | Supply architecture, supported features, and a query trace for the proposed internal outline review with Enamul. |
-| **Wed Nov 11** | Help verify references and contrasting data cases before the held-out workload freezes. |
-| **Sat Nov 14** | Support evaluation with correctness fixes only. Coordinate reruns after fixes; preserve the frozen feature profile. |
-| **Wed Nov 18** | Finish architecture text and assemble the four-page draft from everyone's sections, figures, and results. Review technical claims. |
-| **Sat Nov 21** | Verify a clean build, regression checks, instructions, and demo queries. Rehearse tracing one query through the compiler. |
-| **Sun Nov 22** | Review/approve the PDF and artifact, confirm authorship with the group, and coordinate submission. Reserve Nov 23 for submission issues. |
+| **Wed Nov 4** | Trace one SQLP question through AST → joins → SQLite → checked record. Inspect development questions and kit payloads. Arrange a second human answer review; choose model/access/budget when ready. |
+| **Sat Nov 7** | Once access is supplied, run the paired development pilot and inspect failures/usage. Freeze syntax/guides. Decide whether a matched NatSQL condition fits the time and scope. |
+| **Mon Nov 9** | Explain the ARM entity/key/role mappings, generated views, and query trace to Enamul if available. Review outline and actual pilot/offline evidence. |
+| **Wed Nov 11** | Finish human answer review; freeze reserved workload, data/views/catalog, settings, and limits. Verify a fresh kit before reserved calls. |
+| **Sat Nov 14** | Complete paired runs and analysis. Inspect wrong answers and usage, then load real records in the viewer. |
+| **Wed Nov 18** | Finish four-page draft/figure with claims tied to saved evidence. Keep paper files local. |
+| **Sat Nov 21** | Reproduce setup, check the real browser, rehearse, record video, and incorporate review. |
+| **Sun Nov 22** | Confirm contributor approval/authorship and submit. Reserve Nov 23 for submission issues. |
 
-**Required subset:** projections, one FROM binding/alias, multi-hop paths, literal equality/AND, DISTINCT, parameters, and basic checks. EXISTS, UNION, and broader syntax remain later goals. If the Nov 4 handoff slips, simplify the first parser immediately and flag the dependency.
+For the next three-hour block: spend roughly one hour tracing a compiler test,
+one reviewing several development questions and their Python answer plans, and
+one inspecting dry-run payloads plus the demo. I should be able to explain what
+the catalog supplies, what the compiler guarantees, and what the oracle checks.
 
-**Learning:** work in small increments you can explain. Use AI for bounded help and counterexamples. A large unfamiliar generated implementation would undermine the goal.
+No model calls until access is supplied. An offline check is not an AI result.
+Full ARM identity reasoning, a native executor, discovery, and extra syntax stay
+outside this deadline. If access/review slips, revise scope before adding work.
 
-[Shared schedule](SCHEDULE.md) · [Agent context](../AGENTS.md)
+[Shared checkpoints](SCHEDULE.md) · [Experiment kit](../EXPERIMENT_KIT.md)

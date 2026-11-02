@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>SQLP Query Explorer</title>
+  <link rel="stylesheet" href="viewer.css">
+  <script defer src="viewer.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <a class="wordmark" href="index.html" aria-label="SQLP Query Explorer home">SQLP<span class="wordmark-dot">.</span></a>
+      <span class="header-note">Query comparison / local records</span>
+      <span class="privacy-indicator"><span aria-hidden="true">●</span> Files stay in this browser</span>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Follow the query. Inspect the evidence.</p>
+        <h1 id="page-title">Two languages.<br>One question.</h1>
+        <p class="intro-copy">Compare recorded SQL and SQLP attempts, inspect their answers, and follow a path to the joins it becomes.</p>
+      </section>
+      <section class="file-panel" aria-labelledby="load-title">
+        <div>
+          <h2 id="load-title">Open a comparison record</h2>
+          <p>A version-1 JSON report from the prepared runner or model pilot. No queries or model calls run here.</p>
+        </div>
+        <label class="file-label" for="report-file">Choose JSON file
+          <input id="report-file" type="file" accept=".json,application/json" aria-describedby="file-hint">
+        </label>
+        <p id="file-hint" class="file-hint">Maximum file size: 16 MiB. Nothing is uploaded or stored.</p>
+      </section>
+      <p id="load-error" class="notice error-notice" role="alert" hidden></p>
+      <p id="load-status" class="sr-only" role="status" aria-live="polite"></p>
+      <section class="file-panel mapping-loader" aria-labelledby="mapping-load-title">
+        <div>
+          <h2 id="mapping-load-title">Optional: inspect a schema mapping</h2>
+          <p>Open a restricted ARM mapping artifact to inspect logical entities, physical columns, references, and view definitions.</p>
+        </div>
+        <label class="file-label" for="mapping-file">Choose mapping JSON
+          <input id="mapping-file" type="file" accept=".json,application/json" aria-describedby="mapping-file-hint">
+        </label>
+        <p id="mapping-file-hint" class="file-hint">Loaded separately. Association with a comparison is checked only where recorded evidence is available.</p>
+      </section>
+      <p id="mapping-error" class="notice error-notice" role="alert" hidden></p>
+      <p id="mapping-status" class="sr-only" role="status" aria-live="polite"></p>
+      <details id="mapping-panel" class="mapping-panel" hidden>
+        <summary>Inspect logical-to-physical mapping</summary>
+        <p id="mapping-name" class="record-name"></p>
+        <p id="mapping-association" class="notice"></p>
+        <p class="small muted">Restricted source-table primary keys and named references. This artifact does not establish cross-source entity identity, full EID semantics, or entity equality. These are supplied records, not authenticated claims.</p>
+        <div id="mapping-entities" class="mapping-entities"></div>
+        <details>
+          <summary>Recorded mapping identity and hashes</summary>
+          <dl id="mapping-identities" class="identity-fields"></dl>
+        </details>
+      </details>
+      <section id="workspace" hidden aria-label="Loaded comparison">
+        <div class="record-bar">
+          <div><span id="origin-badge" class="badge"></span> <span id="record-scope" class="muted"></span></div>
+          <span id="record-name" class="record-name"></span>
+        </div>
+        <p id="origin-note" class="origin-note"></p>
+        <div id="summary" class="summary" aria-label="Recorded outcomes"></div>
+        <div id="record-error" class="notice error-notice" hidden></div>
+        <p id="empty-notice" class="notice" hidden></p>
+        <section id="question-section" class="question-panel" aria-labelledby="question-label" hidden>
+          <label id="question-label" class="eyebrow" for="case-select">Question</label>
+          <select id="case-select"></select>
+          <h2 id="question-text"></h2>
+          <p id="question-meta" class="muted"></p>
+        </section>
+        <div id="comparison" class="comparison" aria-label="SQL and SQLP attempts"></div>
+        <details id="expected-panel" class="expected-panel" hidden>
+          <summary>Inspect the recorded expected answer</summary>
+          <p class="muted">Correctness labels come from the runner's expected answer. Agreement between the two attempts alone does not establish correctness.</p>
+          <div id="expected-answer"></div>
+        </details>
+        <details id="provenance-panel" class="provenance" hidden>
+          <summary>Data and run identity</summary>
+          <dl id="provenance-fields"></dl>
+        </details>
+      </section>
+      <section id="empty-state" class="empty-state">
+        <span class="empty-symbol" aria-hidden="true">{ }</span>
+        <h2>Start with a saved run</h2>
+        <p>Generate a report with <code>python3 -m tools.run_comparison</code>, then open its JSON file above.</p>
+        <div class="empty-steps"><span>01 · Choose a question</span><span>02 · Compare attempts</span><span>03 · Inspect the path</span></div>
+      </section>
+    </main>
+    <footer><span>SQLP for AI Agents</span><span>Correctness &amp; token usage</span></footer>
+  </div>
+</body>
+</html>

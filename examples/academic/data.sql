@@ -21,9 +21,12 @@ CREATE TABLE WROTE (
     author_aid INTEGER NOT NULL REFERENCES AUTHOR(aid),
     paper_pid INTEGER NOT NULL REFERENCES PAPER(pid)
 );
-INSERT INTO UNIVERSITY VALUES (1, 'Waterloo', 'CA'), (2, 'Aarhus', 'DK');
+INSERT INTO UNIVERSITY VALUES (1, 'Waterloo', 'CA'), (2, 'Aarhus', 'DK'),
+    (3, 'Fictional US Publisher', 'US');
 INSERT INTO AUTHOR VALUES (1, 'Alice', 1, 2), (2, 'Bob', 2, 1), (3, 'Caro', 1, 2);
-INSERT INTO PAPER VALUES (10, 'Databases', 2), (11, 'Graphs', 1);
+-- A US publisher with no US-affiliated authors distinguishes a wrong publisher
+-- country path from the genuinely empty US-authorship answer.
+INSERT INTO PAPER VALUES (10, 'Databases', 2), (11, 'Graphs', 3);
 -- Duplicate authorship rows make accidental set comparison visible.
 INSERT INTO WROTE VALUES (1, 10), (1, 10), (2, 10), (3, 11), (2, 11);
 COMMIT;

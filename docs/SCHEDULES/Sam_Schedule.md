@@ -1,26 +1,28 @@
-# Samridh's schedule — website and demo
+# Samridh's schedule — optional demo handoff
 
-Build the TypeScript comparison website. Show the question, generated queries, SQLP translation, answers, errors, and tokens. Iris runs experiments; Ryan compiles SQLP. Support a third representation when NatSQL passes its integration gate.
+Updated November 2, 2026. Availability is unconfirmed; these are bounded tasks
+if you return, not new commitments. Required delivery currently rests with Ryan.
+Earlier contributions and authorship remain a separate discussion.
 
-**Current course proposal:** review the walkthrough/readability before Canvas submission.
+A local saved-record viewer already exists in plain HTML/CSS/JavaScript. The
+most valuable help is testing it in a real browser and making the walkthrough
+clear. A TypeScript rewrite is unnecessary for this deadline.
 
-| Due | Deliverable |
+| Due, 2026 | Useful contribution |
 |---|---|
-| **Wed Oct 28** | Read IDEA.md, agree on one run record with Iris, and sketch the comparison page. |
-| **Sat Oct 31** | Display two clearly labeled sample records, including answers/errors/tokens. Help choose the dataset, start questions/reference SQL, and share the three-hour NatSQL compatibility check. |
-| **Wed Nov 4** | Make the page load Iris's saved run records so UI work proceeds independently of a live API. |
-| **Sat Nov 7** | Display real SQL/SQLP pilot records and compiled SQL. Clicking a path should show its join mapping. Add a NatSQL view only if integrated; keep the two-condition page working. Continue the held-out question bank. |
-| **Mon Nov 9** | Supply a screenshot and visitor walkthrough for the proposed internal outline review. |
-| **Wed Nov 11** | Finish your half of the held-out questions/reference SQL and cross-check Iris's half before the workload freezes. |
-| **Sat Nov 14** | Connect the question form to Iris's local runner; show running/error/completed states. Help inspect results and finish simple path highlighting. |
-| **Wed Nov 18** | Complete the demonstration-scenarios text, screenshot, and walkthrough for the four-page draft. |
-| **Sat Nov 21** | Rehearse the working demo. Record the encouraged video, at most five minutes/50 MB. Prepare a labeled replay of real runs and verify displays against Iris's records. |
-| **Sun Nov 22** | Review/approve screenshots, video, and interaction claims; support submission. Reserve Nov 23 for submission issues. |
+| **Wed Nov 4** | Read IDEA.md, open the viewer, and check one prepared report. Confirm the labels clearly distinguish prepared queries, replay, and real model records. |
+| **Sat Nov 7** | Check query/answer/token displays, path-to-join selection, and ARM mapping/view details. Report concrete browser issues; show real pilot records if available. |
+| **Mon Nov 9** | Prepare a short walkthrough and screenshot for internal review. Explain how a named role maps to stored columns. |
+| **Wed Nov 11** | Independently check an agreed subset of reserved questions/answers if available; confirm interpretation before the study freeze. |
+| **Sat Nov 14** | Load real results, inspect failure displays, and polish only what improves the comparison. |
+| **Wed Nov 18** | Review demo-scenario text and screenshots against implemented interactions. |
+| **Sat Nov 21** | Rehearse and record the encouraged video, at most five minutes/50 MB. Check the demo works offline with saved real records. |
+| **Sun Nov 22** | Approve your contributions and final screenshots/interaction claims. |
 
-**Minimum interaction:** choose a question, compare queries/answers/tokens, and inspect a path's physical join. A highlighted list is sufficient before graph animation.
+Minimum interaction: choose a question, compare queries/answers/tokens, inspect
+paths and their mappings. Live arbitrary-question generation is optional and
+unimplemented; arbitrary answers remain unscored without an independent oracle.
+Cut animation before answer visibility. Cloud hosting, authentication, discovery,
+and another compiler are outside this deadline.
 
-Prepared questions have checked correctness labels. Arbitrary questions say **“not independently benchmark-scored.”** Label live runs, recorded real runs, and sample fixtures accurately.
-
-**Scope:** prioritize the local walkthrough. Cut animation/styling before answer visibility. Authentication, a general editor, discovery, cloud deployment, and another compiler are outside this deadline.
-
-[Shared schedule](SCHEDULE.md) · [Agent context](../AGENTS.md)
+[Shared schedule](SCHEDULE.md) · [Viewer instructions](../VIEWER.md)

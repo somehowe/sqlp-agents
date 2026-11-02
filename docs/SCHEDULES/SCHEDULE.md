@@ -1,35 +1,50 @@
-# Group schedule — SQLP for AI Agents
+# Delivery schedule — SQLP for AI Agents
 
-Internal checkpoints for group review, updated October 27, 2026.
+Updated November 2, 2026. Goal: one interactive comparison and four-page ICDE
+demo paper. Required delivery assumes Ryan at 12–15 hours a week. Iris and Sam's
+plans are optional handoffs until their availability is confirmed; this does
+not settle authorship. The first Sunday checkpoint, November 1, has passed.
 
-**Goal:** one interactive demo and four-page paper comparing correctness and total tokens for SQL/SQLP, with NatSQL if its existing converter is usable. SQLite executes all conditions.
+The compiler, SQLite runner, saved-record viewer, restricted ARM views, pinned
+Chinook workload, offline benchmarks, and frozen experiment kit now work. **No
+model results exist.** Current priorities are understanding the system, human
+answer review, and a real pilot once the user provides model access.
 
-| Owner | Main responsibility | Weekly budget |
-|---|---|---|
-| [Ryan](Ryan_Schedule.md) | C++ SQLP-to-SQL compiler | 12–15 hours |
-| [Iris](Iris_Schedule.md) | Agent runner, SQLite execution, evaluation | 8–10 hours |
-| [Samridh](Sam_Schedule.md) | TypeScript website, demo walkthrough | 8–10 hours |
-
-**By Wed Oct 28:** read [IDEA.md](../IDEA.md); agree on catalog/compiler/run-record examples, model access, budget, and contribution expectations. Iris starts with hand-written SQL; Sam starts with sample records.
-
-**Course writing:** Ryan drafts the opening/SQLP motivation; Iris drafts NatSQL/DIN-SQL related work; Sam reviews the walkthrough. Follow Canvas's deadline. November 9 is a proposed internal review, not an official outline deadline.
-
-| Due | What the group should be able to show |
+| Due, 2026 | Concrete result |
 |---|---|
-| **Sat Oct 31** | Query objects → SQL/parameters → checked SQLite answers. UI displays a record. Select dataset/start questions; decide NatSQL feasibility. |
-| **Wed Nov 4** | Ryan hands Iris a callable text compiler for a tiny supported query. Iris connects it before the pilot. |
-| **Sat Nov 7** | Multi-hop queries, development pilot, and real UI records. Freeze features/guides; NatSQL must be integrated to enter the study. |
-| **Mon Nov 9** | Outline and rough section material for Enamul's review; confirm his intended timing. |
-| **Wed Nov 11** | Finish answer checks; freeze held-out questions, data/catalog versions, workload size, and settings before any held-out calls. |
-| **Sat Nov 14** | Complete the Nov 12–14 evaluation, initial analysis, and connected demo. |
-| **Wed Nov 18** | Complete four-page draft for group/mentor feedback. |
-| **Sat Nov 21** | Checked paper, reproducible artifact, video, and rehearsal ready. |
-| **Sun Nov 22** | All authors approve; designated submitter aims to submit. **Nov 23 is the official deadline and contingency day.** |
+| **Wed Nov 4** | Trace one question end to end; inspect the frozen kit and 12 development questions. Arrange a second human answer review and choose model/access/budget when available. |
+| **Sat Nov 7** | If access is ready, run the 12-question paired development pilot; inspect errors and actual usage. Freeze syntax/guides. Decide whether NatSQL has a fair, feasible common profile. |
+| **Mon Nov 9** | Walk through the ARM mappings and saved-run demo with Enamul if available. Review the outline and actual evidence. This is an internal target, not a conference outline deadline. |
+| **Wed Nov 11** | Finish human review; freeze data/catalog/views, question eligibility, expected answers, model/settings, and limits before reserved model calls. Refresh and verify the kit. |
+| **Sat Nov 14** | Finish the Nov 12–14 paired comparison and descriptive analysis. Inspect wrong answers, failures, and token totals. Load real records in the viewer. |
+| **Wed Nov 18** | Complete the four-page draft using actual results, architecture, audience interactions, and limitations. The current private draft contains offline observations only. |
+| **Sat Nov 21** | Reproduce setup, reconcile every paper number with saved records, test in a real browser, rehearse, and record the encouraged video. |
+| **Sun Nov 22** | Contributors approve PDF/authorship; designated submitter aims to submit. Official deadline: **Nov 23, 11:59 pm AoE**. |
 
-Show a working example each Saturday; flag blocked handoffs early. Hours include reading, writing, and integration.
+Use one capable accessible model first. The workload has 12 development and 30
+reserved questions. Separate Python answer plans check the prepared queries;
+a person still needs to check the interpretation. Reduce the workload before
+seeing reserved model outcomes if review capacity requires it. Repeating these
+questions through ARM views does not double the number of independent tasks.
 
-Use one model, one dataset, about 12 development questions, and a target of 30 held-out questions. Iris/Sam split preparation and cross-check answers. Reduce workload by Nov 11 if needed, before seeing held-out outcomes.
+ARM's restricted implementation is ready for review: declared single-column
+non-null keys, reviewed total references, generated SQLite views, and literal
+answers. Choose direct tables or generated views before freezing the study;
+both languages receive equivalent facts. Full identity reasoning and discovery
+remain outside this deadline.
 
-**NatSQL gate:** three shared person-hours checking five manual cases by Oct 31, then at most three additional shared person-hours integrating by Nov 7. Declare common features and retain conversion failures. If not ready, defer/narrow claims. Cut extra models, repairs, grammar, and animation first.
+NatSQL's pinned converter runs, but manual compatibility checks retain failures
+on some longer/repeated-role queries. A matched NatSQL model condition is still
+unimplemented. Add it only if its guide, eligible profile, and failure handling
+are settled by Nov 7; otherwise keep it as related work and compatibility evidence.
+Cut extra models, repairs, syntax, and animation before core review/writing.
 
-The [ICDE demo call](https://icde2027.github.io/cf-demonstrations.html) requires IEEE format and four pages including references. See [AGENTS.md](../AGENTS.md) for compiler semantics and fair-evaluation rules.
+No API calls until the user supplies access. If the Nov 7 pilot or Nov 11 answer
+review slips, revise the submission scope with Enamul; do not relabel prepared
+queries or replay as model evidence. Paper files stay local under resources.
+Course assignments follow Canvas separately. The verified ICDE demo call asks
+for four IEEE pages including references and an interactive scenario; video is
+encouraged, at most five minutes/50 MB.
+
+[Ryan](Ryan_Schedule.md) · [Iris](Iris_Schedule.md) · [Sam](Sam_Schedule.md) ·
+[Experiment kit](../EXPERIMENT_KIT.md) · [Context](../AGENTS.md)

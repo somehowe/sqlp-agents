@@ -1,24 +1,28 @@
-# Iris's schedule — agent runner and evaluation
+# Iris's schedule — optional evaluation handoff
 
-Build the runner: separate model calls, Ryan's compiler, SQLite execution, independent answer checking, and saved queries/results/tokens for Sam's website. Add NatSQL through its existing converter if the integration gate passes.
+Updated November 2, 2026. Availability is unconfirmed; these are useful bounded
+tasks if you return, not new commitments. Required delivery currently rests with
+Ryan. Earlier contributions and authorship remain a separate discussion.
 
-**Current course proposal:** read IDEA.md and the NatSQL/DIN-SQL overviews; draft their related-work paragraph by Canvas's actual deadline.
+The runner already makes separate requests, calls the compiler, executes SQLite,
+checks row bags, and records usage. The most valuable help is **human question
+and answer review**, followed by inspecting real model failures.
 
-| Due | Deliverable |
+| Due, 2026 | Useful contribution |
 |---|---|
-| **Wed Oct 28** | Agree on catalog/compiler/run-record formats, model access, and call budget. |
-| **Sat Oct 31** | Load a tiny SQLite fixture; execute/reference-score hand-written SQL. Give Sam one example record and run Ryan's compiled query. Choose a manageable dataset and start questions with Sam. Share the three-hour NatSQL compatibility check. |
-| **Wed Nov 4** | Connect Ryan's minimal text compiler. Verify one complete SQLP-to-SQLite run against an independently checked answer. |
-| **Sat Nov 7** | Run a paired development pilot on one model, aiming for 12 questions. Save prompts, failures, and raw usage; freeze language guides. If its check passed, integrate NatSQL within three additional shared person-hours; otherwise defer it. |
-| **Mon Nov 9** | Supply methods, related work, and labeled pilot evidence for the proposed internal outline review. |
-| **Wed Nov 11** | With Sam, finish/cross-check held-out questions and reference answers, targeting 30. Freeze workload, data/catalog versions, and run settings before any held-out calls. |
-| **Sat Nov 14** | Complete the Nov 12–14 comparison and correctness/token summaries. Inspect failures. Expose a thin local interface so Sam can trigger the same runner. |
-| **Wed Nov 18** | Complete methods/results/limitations material for the four-page draft. Report every condition actually tested. |
-| **Sat Nov 21** | Check paper numbers against saved records; rerun affected cases after fixes. Save reproduction instructions and real recorded runs for the demo. |
-| **Sun Nov 22** | Review/approve the final numbers and claims; support submission. Reserve Nov 23 for submission issues. |
+| **Wed Nov 4** | Read IDEA.md; review several development questions against the data and expected answers. Trace one saved run with Ryan. |
+| **Sat Nov 7** | Review paired pilot failures and raw usage if access is ready. Check both languages receive equivalent relationship facts and corresponding guides. |
+| **Mon Nov 9** | Review the methods/related-work paragraph and ARM example for the internal outline walkthrough. |
+| **Wed Nov 11** | Cross-check an agreed subset of reserved questions/answers before the study freezes. Flag ambiguous wording, wrong roles, and duplicate-sensitive answers. |
+| **Sat Nov 14** | Inspect real wrong answers/failures and descriptive summaries; confirm failures stay in the denominator and missing usage stays unknown. |
+| **Wed Nov 18** | Review methods/results/limitations against the actual saved records. |
+| **Sat Nov 21** | Recheck paper numbers and reproduction instructions. |
+| **Sun Nov 22** | Approve your contributions and final claims before submission. |
 
-**Controls:** same model/settings, questions, relationship facts, and comparable guides/workflow. First attempts are required; repairs are optional. Keep reference answers hidden from the model. Count all input/output tokens without double-counting usage fields; total tokens do not directly measure thinking time.
+Model inputs contain the question, schema/relationships, and language guide;
+prepared queries and expected rows stay private. Count all provider-reported
+input/output tokens without double-counting cache/reasoning details. Tokens do
+not directly measure thinking time. NatSQL remains optional; do not rebuild the
+runner or start another compiler for this deadline.
 
-**Shared work:** draft half the held-out questions/reference SQL; Sam drafts half. Cross-check answers, including wrong-role and duplicate-sensitive cases. Set any smaller workload before evaluation, never based on results. Compare NatSQL on a declared supported overlap and retain conversion failures.
-
-[Shared schedule](SCHEDULE.md) · [Agent context](../AGENTS.md)
+[Shared schedule](SCHEDULE.md) · [Workload](../WORKLOAD.md)

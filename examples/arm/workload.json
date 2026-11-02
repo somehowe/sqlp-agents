@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "scope": "development",
+  "cases": [
+    {
+      "id": "author-versus-publisher",
+      "question": "List each author occurrence and publication whose author is affiliated with a Canadian university.",
+      "sql": "SELECT a.name, p.title FROM WROTE AS w JOIN AUTHOR AS a ON w.author_aid = a.aid JOIN UNIVERSITY AS u ON a.uni_id = u.uid JOIN PAPER AS p ON w.paper_pid = p.pid WHERE u.country = 'CA';",
+      "sqlp": "SELECT w.author.name, w.paper.title FROM WROTE w WHERE w.author.university.country = 'CA';",
+      "column_count": 2,
+      "expected_rows": [["Alice", "Databases"], ["Alice", "Databases"], ["Caro", "Graphs"]]
+    },
+    {
+      "id": "publisher-distinct",
+      "question": "Which distinct authors have a publication whose publisher is based in Denmark?",
+      "sql": "SELECT DISTINCT a.name FROM WROTE AS w JOIN AUTHOR AS a ON w.author_aid = a.aid JOIN PAPER AS p ON w.paper_pid = p.pid JOIN UNIVERSITY AS u ON p.publisher_uid = u.uid WHERE u.country = 'DK';",
+      "sqlp": "SELECT DISTINCT w.author.name FROM WROTE w WHERE w.paper.publisher.country = 'DK';",
+      "column_count": 1,
+      "expected_rows": [["Alice"], ["Bob"]]
+    },
+    {
+      "id": "mentor-cycle",
+      "question": "For every author, list their name and their mentor's mentor's name.",
+      "sql": "SELECT a.name, m2.name FROM AUTHOR AS a JOIN AUTHOR AS m1 ON a.mentor_aid = m1.aid JOIN AUTHOR AS m2 ON m1.mentor_aid = m2.aid;",
+      "sqlp": "SELECT a.name, a.mentor.mentor.name FROM AUTHOR a;",
+      "column_count": 2,
+      "expected_rows": [["Alice", "Alice"], ["Bob", "Bob"], ["Caro", "Alice"]]
+    }
+  ]
+}

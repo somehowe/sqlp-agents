@@ -36,7 +36,7 @@ Names must exactly match physical names. Duplicate names differing only in ASCII
 Checks cover:
 
 - Missing tables/columns and TEMP shadows.
-- Actual SQLite storage types: integer values for `integer`, text for `string`. Ordinary attributes may be NULL.
+- Actual SQLite storage types: integer values for `integer`, text for `string`. Ordinary attributes may be NULL. Raw text must decode under the database's declared UTF-8/UTF-16 encoding; malformed text reports `invalid_text_encoding`.
 - Declared unique columns treated as non-null keys, including keys unused by the current query.
 - Non-null reference sources and exactly one target match for every source row. Duplicate source values are allowed.
 
@@ -44,7 +44,7 @@ Reference checks preserve the compiler's operand order, `source.key = target.key
 
 Each issue has a `code`, `count`, and relevant table/column or reference fields. Data counts measure violating rows; `duplicate_unique_key.count` measures duplicate value groups. Missing/shadowed schema objects have count `1`. Malformed catalogs and database failures instead return an `error` with a `stage` and `message`.
 
-Run preflight after importing or changing data, before model calls. Save its report as setup evidence. A failed preflight is a dataset/setup failure and must not count as an agent's wrong answer. Validation can scan whole tables, so it belongs outside per-query timing/token measurements.
+Run preflight after importing or changing data, before model calls. Save its report as setup evidence. A failed preflight is a dataset/setup failure and must not count as an agent's wrong answer. Validation can scan whole tables, so it belongs outside per-query timing/token measurements. The CLI accepts `--timeout` (30 seconds by default) and reports `preflight_timeout` as a setup error. Target-key indexes are strongly recommended: reference validation can otherwise scan targets for each source row. The checker never creates indexes or changes the data.
 
 ## Reuse the same catalog with the compiler
 
@@ -59,7 +59,7 @@ from tools.validate_dataset import compiler_arguments, load_catalog, validate_da
 
 catalog = load_catalog('examples/academic/catalog.json')
 with closing(sqlite3.connect('file:build/academic.sqlite?mode=ro', uri=True)) as database:
-    report = validate_dataset(database, catalog)
+    report = validate_dataset(database, catalog, timeout_seconds=30)
     if not report['ok']:
         raise RuntimeError(report)
     query = ("SELECT w.author.name FROM WROTE w "
@@ -80,3 +80,5 @@ with closing(sqlite3.connect('file:build/academic.sqlite?mode=ro', uri=True)) as
 The duplicate result is intentional. Add DISTINCT only when the question requests distinct answers. [Compiler protocol](COMPILER_CLI.md) · [Project context](AGENTS.md).
 
 The [prepared comparison runner](QUERY_COMPARISON.md) uses this same fixture/catalog to execute both conditions, check duplicate-sensitive answers, and save records for the interface.
+
+API: `validate_dataset(connection, catalog, *, timeout_seconds=None)` preserves a caller transaction. With `None`, it leaves the caller's progress handler alone. An explicit timeout owns/replaces the handler for this call and clears it afterward; expiry raises `PreflightTimeoutError`. Call it on a connection whose handler you can hand over, or omit the timeout to retain your own handler.

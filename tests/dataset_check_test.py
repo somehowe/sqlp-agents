@@ -12,7 +12,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.validate_dataset import compiler_arguments, load_catalog, validate_dataset
+from tools.validate_dataset import PreflightTimeoutError, compiler_arguments, load_catalog, validate_dataset
 
 
 def catalog():
@@ -60,9 +60,13 @@ class DatasetCheckTests(unittest.TestCase):
         self.assertEqual(len(matches), 1, matches)
         return matches[0]
 
-    def invoke_cli(self, database, description, code):
+    def invoke_cli(self, database, description, code, *, timeout=None):
+        arguments = [sys.executable, str(ROOT / "tools" / "validate_dataset.py"),
+                     str(database), str(description)]
+        if timeout is not None:
+            arguments.extend(["--timeout", str(timeout)])
         result = subprocess.run(
-            [sys.executable, str(ROOT / "tools" / "validate_dataset.py"), str(database), str(description)],
+            arguments,
             capture_output=True, text=True, encoding="utf-8", timeout=5,
         )
         self.assertEqual(result.returncode, code, result.stdout)
@@ -91,6 +95,31 @@ class DatasetCheckTests(unittest.TestCase):
         issues = [entry for entry in self.report()["issues"] if entry["code"] == "invalid_type"]
         self.assertEqual({(entry["table"], entry["column"], entry["count"]) for entry in issues},
                          {("PARENT", "id", 1), ("PARENT", "name", 1)})
+
+    def test_malformed_text_is_rejected_before_python_result_decoding(self):
+        self.database.execute("UPDATE PARENT SET name = CAST(x'80' AS TEXT) WHERE id = 1")
+        self.database.execute("UPDATE PARENT SET name = CAST(x'c0af' AS TEXT) WHERE id = 2")
+        entry = self.issue("invalid_text_encoding")
+        self.assertEqual((entry["table"], entry["column"], entry["count"]), ("PARENT", "name", 2))
+        with self.assertRaises(sqlite3.OperationalError):
+            self.database.execute("SELECT name FROM PARENT").fetchall()
+
+    def test_text_checks_respect_utf16_database_encoding(self):
+        description = {"version": 1, "tables": [{"name": "T", "columns": [
+            {"name": "name", "type": "string", "unique": False}]}], "references": []}
+        for encoding, malformed in [("UTF-16le", "00d8"), ("UTF-16be", "d800")]:
+            with self.subTest(encoding=encoding):
+                connection = sqlite3.connect(":memory:")
+                try:
+                    connection.execute(f"PRAGMA encoding='{encoding}'")
+                    connection.execute("CREATE TABLE T(name TEXT)")
+                    connection.executemany("INSERT INTO T VALUES (?)", [("café 🧠\0",), (None,)])
+                    self.assertTrue(validate_dataset(connection, description)["ok"])
+                    connection.execute(f"INSERT INTO T VALUES (CAST(x'{malformed}' AS TEXT))")
+                    entry = self.issue("invalid_text_encoding", validate_dataset(connection, description))
+                    self.assertEqual((entry["table"], entry["column"], entry["count"]), ("T", "name", 1))
+                finally:
+                    connection.close()
 
     def test_unique_keys_cannot_be_null(self):
         self.database.execute("UPDATE PARENT SET id = NULL WHERE id = 2")
@@ -183,6 +212,44 @@ class DatasetCheckTests(unittest.TestCase):
         self.database.rollback()
         self.assertEqual(self.database.execute("SELECT COUNT(*) FROM CHILD WHERE note = 'uncommitted'").fetchone(), (0,))
 
+    def test_no_budget_preserves_the_callers_progress_handler(self):
+        calls = 0
+
+        def progress():
+            nonlocal calls
+            calls += 1
+            return 0
+
+        self.database.set_progress_handler(progress, 1)
+        self.assertTrue(self.report()["ok"])
+        before = calls
+        self.database.execute("SELECT COUNT(*) FROM CHILD").fetchone()
+        self.assertGreater(calls, before)
+        self.database.set_progress_handler(None, 0)
+
+    def test_preflight_timeout_interrupts_views_and_preserves_transaction_ownership(self):
+        self.database.execute("CREATE VIEW LOOP AS WITH RECURSIVE n(id) AS "
+                              "(VALUES(1) UNION ALL SELECT id+1 FROM n) SELECT id FROM n")
+        description = {"version": 1, "tables": [{"name": "LOOP", "columns": [
+            {"name": "id", "type": "integer", "unique": False}]}], "references": []}
+        for caller_transaction in (False, True):
+            with self.subTest(caller_transaction=caller_transaction):
+                if caller_transaction:
+                    self.database.execute("INSERT INTO CHILD VALUES (2, 'pending')")
+                with self.assertRaises(PreflightTimeoutError):
+                    validate_dataset(self.database, description, timeout_seconds=0.02)
+                self.assertEqual(self.database.in_transaction, caller_transaction)
+                self.assertEqual(self.database.execute("SELECT 1").fetchone(), (1,))
+                if caller_transaction:
+                    self.assertEqual(self.database.execute("SELECT COUNT(*) FROM CHILD WHERE note='pending'").fetchone(), (1,))
+                    self.database.rollback()
+
+    def test_invalid_preflight_budgets_are_rejected_before_transactions(self):
+        for timeout in (0, -1, True, float("inf"), float("nan"), 10**1000, "1"):
+            with self.subTest(timeout=str(timeout)), self.assertRaises(ValueError):
+                validate_dataset(self.database, catalog(), timeout_seconds=timeout)
+            self.assertFalse(self.database.in_transaction)
+
     def test_invalid_catalog_metadata_is_rejected(self):
         edits = [
             lambda c: c.update(version=True),
@@ -262,6 +329,24 @@ class DatasetCheckTests(unittest.TestCase):
             report = self.invoke_cli(database_path, catalog_path, 2)
             self.assertEqual(report["error"]["stage"], "catalog")
             self.assertFalse(database_path.exists())
+
+    def test_cli_has_a_separate_preflight_timeout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "loop.sqlite"
+            catalog_path = Path(directory) / "catalog.json"
+            description = {"version": 1, "tables": [{"name": "LOOP", "columns": [
+                {"name": "id", "type": "integer", "unique": False}]}], "references": []}
+            catalog_path.write_text(json.dumps(description), encoding="utf-8")
+            connection = sqlite3.connect(database_path)
+            try:
+                connection.execute("CREATE VIEW LOOP AS WITH RECURSIVE n(id) AS "
+                                   "(VALUES(1) UNION ALL SELECT id+1 FROM n) SELECT id FROM n")
+            finally:
+                connection.close()
+            before = database_path.read_bytes()
+            report = self.invoke_cli(database_path, catalog_path, 2, timeout=0.02)
+            self.assertEqual(report["error"]["stage"], "preflight_timeout")
+            self.assertEqual(database_path.read_bytes(), before)
 
 
 if __name__ == "__main__":

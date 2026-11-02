@@ -1,6 +1,7 @@
 """Exercise manual paired query runs, answer checking, and execution limits."""
 
 import copy
+import json
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -65,6 +66,7 @@ class ComparisonTests(unittest.TestCase):
         self.assertTrue(report["ok"])
         self.assertEqual((report["version"], report["origin"], report["scope"]),
                          (1, "manual", "development"))
+        self.assertEqual(report["limits"]["preflight_timeout_seconds"], 30.0)
         runs = {run["language"]: run for run in report["cases"][0]["runs"]}
         self.assertEqual(runs["sql"]["rows"], runs["sqlp"]["rows"])
         self.assertEqual(runs["sqlp"]["rows"], [
@@ -98,6 +100,19 @@ class ComparisonTests(unittest.TestCase):
         self.assertTrue(runs["sqlp"]["correct"])
         self.assertEqual(runs["sql"]["rows"], [])
         self.assertEqual(len(runs["sql"]["columns"]), 2)
+
+    def test_contrasting_publisher_rows_expose_wrong_role_on_empty_answer(self):
+        description = workload(
+            "SELECT a.name FROM WROTE w JOIN AUTHOR a ON w.author_aid=a.aid "
+            "JOIN PAPER p ON w.paper_pid=p.pid JOIN UNIVERSITY pub "
+            "ON p.publisher_uid=pub.uid WHERE pub.country='US'",
+            "SELECT w.author.name FROM WROTE w WHERE w.author.university.country='US';", [])
+        runs = self.runs(description)
+        self.assertEqual(runs["sql"]["status"], "ok")
+        self.assertFalse(runs["sql"]["correct"])
+        self.assertEqual(len(runs["sql"]["rows"]), 2)
+        self.assertTrue(runs["sqlp"]["correct"])
+        self.assertEqual(runs["sqlp"]["rows"], [])
 
     def test_numeric_values_compare_equally_without_coercing_text(self):
         for expression, correct in [("1.0", True), ("'1'", False)]:
@@ -146,6 +161,25 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(runs["sql"]["error"]["stage"], "execute")
         self.assertEqual(runs["sql"]["error"]["code"], "sqlite")
 
+    def test_sql_generated_malformed_text_is_a_query_failure(self):
+        runs = self.runs(workload(sql="SELECT CAST(x'80' AS TEXT)"))
+        self.assertEqual(runs["sql"]["status"], "error")
+        self.assertEqual(runs["sql"]["error"]["code"], "text_decoding")
+        self.assertTrue(runs["sqlp"]["correct"])
+
+    def test_residual_sqlp_text_decoding_failure_is_a_data_setup_error(self):
+        real_execute = comparison_module._execute
+
+        def decode_failure_after_sql(*args, **kwargs):
+            if args[2]:
+                raise comparison_module.QueryError("text_decoding", "Cannot decode supplied text")
+            return real_execute(*args, **kwargs)
+
+        with patch.object(comparison_module, "_execute", side_effect=decode_failure_after_sql):
+            with self.assertRaises(SetupError) as failure:
+                self.compare()
+        self.assertEqual(failure.exception.stage, "database")
+
     def test_generated_statements_cannot_modify_or_reconfigure_the_database(self):
         statements = ["DELETE FROM AUTHOR", "PRAGMA table_info(AUTHOR)",
                       "CREATE TEMP TABLE AUTHOR(name TEXT)", "ATTACH ':memory:' AS other",
@@ -165,6 +199,37 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(runs["sql"]["error"]["code"], "row_limit")
         self.assertFalse(runs["sql"]["correct"])
         self.assertTrue(runs["sqlp"]["correct"])
+
+    def test_sql_byte_limit_retains_both_conditions_without_compiler_failure(self):
+        column = "column_" + "x" * 600
+        self.execute('CREATE TABLE WIDE("' + column + '" INTEGER)')
+        self.execute('INSERT INTO WIDE VALUES (7)')
+        self.catalog["tables"].append({"name": "WIDE", "columns": [
+            {"name": column, "type": "integer", "unique": False}]})
+        sql = 'SELECT ' + ', '.join('"' + column + '"' for _ in range(2000)) + ' FROM WIDE;'
+        sqlp = 'SELECT ' + ', '.join('w."' + column + '"' for _ in range(2000)) + ' FROM WIDE w;'
+        self.assertGreater(len(sql.encode("utf-8")), comparison_module.SQLITE_BYTES)
+        runs = self.runs(workload(sql, sqlp, [[7] * 2000], width=2000))
+        self.assertIsNotNone(runs["sqlp"]["sql"])
+        for run in runs.values():
+            self.assertEqual(run["status"], "error")
+            self.assertFalse(run["correct"])
+            self.assertIsNone(run["rows"])
+            self.assertEqual(run["error"]["stage"], "execute")
+            self.assertEqual(run["error"]["code"], "size_limit")
+
+    def test_sql_byte_limit_counts_utf8_bytes_not_characters(self):
+        with sqlite3.connect(":memory:") as connection:
+            connection.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH, 32)
+            sql = "SELECT 1; --" + "é" * 12
+            self.assertLess(len(sql), 32)
+            self.assertGreater(len(sql.encode("utf-8")), 32)
+            with self.assertRaises(comparison_module.QueryError) as error:
+                comparison_module._execute(connection, sql, [], max_rows=1, timeout=1)
+            self.assertEqual(error.exception.code, "size_limit")
+            # A rejected condition must release its authorizer/progress handler.
+            connection.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH, comparison_module.SQLITE_BYTES)
+            connection.execute("CREATE TABLE next_condition(value INTEGER)")
 
     def test_nonterminating_sql_is_stopped_and_the_next_condition_still_runs(self):
         sql = ("WITH RECURSIVE n(v) AS (VALUES(1) UNION ALL SELECT v+1 FROM n) "
@@ -200,6 +265,49 @@ class ComparisonTests(unittest.TestCase):
         with self.assertRaises(SetupError) as failure:
             self.compare()
         self.assertEqual(failure.exception.stage, "preflight")
+
+    def test_malformed_text_is_a_preflight_failure_not_a_compiler_failure(self):
+        self.execute("UPDATE AUTHOR SET name=CAST(x'80' AS TEXT) WHERE aid=1")
+        with self.assertRaises(SetupError) as failure:
+            self.compare()
+        self.assertEqual(failure.exception.stage, "preflight")
+        issues = failure.exception.details["issues"]
+        self.assertIn({"code": "invalid_text_encoding", "count": 1,
+                       "table": "AUTHOR", "column": "name"}, issues)
+
+    def test_preflight_has_its_own_timeout_before_queries_run(self):
+        self.execute("CREATE VIEW LOOP AS WITH RECURSIVE n(id) AS "
+                     "(VALUES(1) UNION ALL SELECT id+1 FROM n) SELECT id FROM n")
+        self.catalog["tables"].append({"name": "LOOP", "columns": [
+            {"name": "id", "type": "integer", "unique": False}]})
+        with patch.object(comparison_module, "_condition") as condition:
+            with self.assertRaises(SetupError) as failure:
+                self.compare(preflight_timeout_seconds=0.02)
+            self.assertEqual(failure.exception.stage, "preflight_timeout")
+            condition.assert_not_called()
+        self.assertEqual(self.execute("SELECT name FROM AUTHOR WHERE aid=1"), [("Alice",)])
+
+    def test_cli_reports_separate_preflight_timeout_as_setup_failure(self):
+        self.execute("CREATE VIEW LOOP AS WITH RECURSIVE n(id) AS "
+                     "(VALUES(1) UNION ALL SELECT id+1 FROM n) SELECT id FROM n")
+        self.catalog["tables"].append({"name": "LOOP", "columns": [
+            {"name": "id", "type": "integer", "unique": False}]})
+        catalog_path = self.database.parent / "catalog.json"
+        workload_path = self.database.parent / "workload.json"
+        catalog_path.write_text(json.dumps(self.catalog), encoding="utf-8")
+        workload_path.write_text(json.dumps(workload()), encoding="utf-8")
+        before = self.database.read_bytes()
+        result = subprocess.run(
+            [sys.executable, "-m", "tools.run_comparison", str(self.database), str(catalog_path),
+             str(workload_path), "--timeout", "5", "--preflight-timeout", "0.02"],
+            cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=5)
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertEqual(result.stderr, "")
+        record = json.loads(result.stdout)
+        self.assertFalse(record["ok"])
+        self.assertEqual(record["error"]["stage"], "preflight_timeout")
+        self.assertEqual(record["cases"], [])
+        self.assertEqual(self.database.read_bytes(), before)
 
     def test_concurrent_commit_cannot_change_the_comparison_snapshot(self):
         self.assertEqual(self.execute("PRAGMA journal_mode=WAL"), [("wal",)])
@@ -239,7 +347,10 @@ class ComparisonTests(unittest.TestCase):
 
     def test_invalid_execution_limits_are_setup_failures(self):
         for options in [{"max_rows": 0}, {"max_rows": sys.maxsize},
-                        {"timeout_seconds": float("inf")}, {"timeout_seconds": True}]:
+                        {"timeout_seconds": float("inf")}, {"timeout_seconds": True},
+                        {"preflight_timeout_seconds": 0}, {"preflight_timeout_seconds": True},
+                        {"preflight_timeout_seconds": float("nan")},
+                        {"preflight_timeout_seconds": 10**1000}]:
             with self.subTest(options=options), self.assertRaises(SetupError) as failure:
                 self.compare(**options)
             self.assertEqual(failure.exception.stage, "workload")

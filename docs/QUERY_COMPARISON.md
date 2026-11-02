@@ -29,7 +29,7 @@ The workload has `version: 1`, `scope: "development"`, and a nonempty `cases` li
 
 Scoring compares row values and duplicate counts, ignoring row order and column aliases. Column order and projection width matter. Numeric `1` and `1.0` compare equal; text `"1"` differs. Large integer comparisons retain precision. A single finite fixture cannot establish query equivalence, so prepare contrasting data and independently review answers before a real study.
 
-The future model adapter must receive only the question, approved schema/relationships, and language instructions. Keep prepared queries and expected answers out of model prompts.
+The [pilot adapter](MODEL_PILOT.md) receives only the question, approved schema/relationships, and language instructions. Keep prepared queries and expected answers out of model prompts.
 
 ## Saved records
 
@@ -45,7 +45,7 @@ Sam can load `build/academic-comparison.json` as a recorded-run fixture. A SQLP 
 
 ## Limits and failure handling
 
-Defaults are `--max-rows 1000` and `--timeout 5`. The timeout applies separately to the compiler process and each SQLite query. A progress handler interrupts long-running SQLite execution; the connection also limits SQL/string/blob/row size to 1,000,000 bytes. These controls bound this local development runner; they are not a hostile-code sandbox. Preflight happens outside per-query limits.
+Defaults are `--max-rows 1000`, `--timeout 5`, and `--preflight-timeout 30`. The timeout applies separately to the compiler process and each SQLite query. A progress handler interrupts long-running SQLite execution; the connection also limits SQL/string/blob/row size to 1,000,000 bytes. These controls bound this local development runner; they are not a hostile-code sandbox. Preflight has its own 30-second default budget; its timeout aborts setup rather than scoring an incorrect answer. These are SQLite progress-handler budgets, not process isolation.
 
 An authorizer blocks database writes, TEMP creation, ATTACH, PRAGMA, transactions, and extension loading. Limits apply equally when executing both conditions' SQL. A row-limit failure never grades a truncated prefix as a complete answer.
 
@@ -53,6 +53,8 @@ Query compilation rejections and SQL errors are retained as failed condition run
 
 Exit codes: `0` means every prepared answer matched; `1` means the comparison completed with an incorrect or failed condition; `2` means setup failed and no comparison should be scored. Root `limits` saves the selected settings. Choose and freeze limits before evaluation, not after inspecting outcomes.
 
-This tool has no model prompts, provider usage accounting, repair loop, or frozen dataset/model version record yet. Those remain the next steps for an actual agent experiment.
+This tool remains a manual development runner. The separate [pilot harness](MODEL_PILOT.md) adds prompts, provider usage, journals, provenance, and offline replay; no real model comparison or repair loop has been collected. The academic data includes a US publisher without US-affiliated authors so following the wrong country role cannot silently pass the empty-US case.
 
 [Dataset checks](DATASET_CHECKS.md) · [Compiler protocol](COMPILER_CLI.md) · [Project context](AGENTS.md)
+
+Use the [local viewer](VIEWER.md) to inspect saved rows and path mappings, or [paired analysis](ANALYSIS.md) for descriptive counts. `python3 -m tools.create_demo build/demo` creates a fresh fixture and reference/deliberate-mistake reports for a local walkthrough.

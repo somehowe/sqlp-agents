@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sqlite3
 import subprocess
+import tempfile
 import unittest
 
 
@@ -365,6 +366,142 @@ class CompilerCliTests(unittest.TestCase):
                      ["--column", "T", "id", "integer", "yes"], CATALOG + ["--help"]]:
             with self.subTest(args=args):
                 self.invoke("", args, code=2, stage="arguments")
+
+    @staticmethod
+    def argument_file(path, arguments):
+        path.write_bytes(b"SQLP-CATALOG-ARGS-1\n" +
+                         b"".join(argument.encode("utf-8") + b"\0" for argument in arguments))
+
+    def test_catalog_argument_file_matches_inline_translation_and_trace(self):
+        query = ("SELECT w.author.name, w.paper.title FROM WROTE w "
+                 "WHERE w.author.university.country='CA' AND w.paper.publisher.country='DK';")
+        direct = self.invoke(query, MULTIHOP_CATALOG)
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.args"
+            self.argument_file(path, MULTIHOP_CATALOG)
+            file_record = self.invoke(query, ["--catalog-args-file", str(path)])
+        self.assertEqual(file_record, direct)
+        with multihop_fixture() as database:
+            self.assertCountEqual(database.execute(file_record["sql"], self.parameters(file_record)).fetchall(),
+                                  [("Alice", "Databases"), ("Alice", "Databases")])
+
+    def test_catalog_argument_file_preserves_quoted_names_and_empty_values(self):
+        table, column = 'table" café\n🧠', 'column\t\n"'
+        arguments = ["--column", table, column, "string", "nonunique"]
+        query = f"SELECT r.{identifier(column)} FROM {identifier(table)} r;"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog café.args"
+            self.argument_file(path, arguments)
+            record = self.invoke(query, ["--catalog-args-file", str(path)])
+            self.assertEqual(record, self.invoke(query, arguments))
+            self.assertEqual(record["trace"]["paths"][0]["column"]["table"], table)
+            self.assertEqual(record["trace"]["paths"][0]["column"]["column"], column)
+            self.argument_file(path, ["--column", "", "id", "integer", "unique"])
+            self.invoke("", ["--catalog-args-file", str(path)], code=1, stage="catalog")
+
+    def test_large_catalog_argument_file_avoids_argv_transport(self):
+        # Over two MiB of metadata travels through the file, while argv contains
+        # only the flag/path. No attempt to exceed the host's argv limit is needed.
+        arguments = []
+        for index in range(2200):
+            table = f"table_{index}_" + "x" * 1000
+            arguments.extend(["--column", table, "id", "integer", "unique"])
+        first_table = arguments[1]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "large.args"
+            self.argument_file(path, arguments)
+            self.assertGreater(path.stat().st_size, 2 * 1024 * 1024)
+            record = self.invoke(f"SELECT r.id FROM {identifier(first_table)} r;",
+                                 ["--catalog-args-file", str(path)])
+        with sqlite3.connect(":memory:") as database:
+            database.execute(f"CREATE TABLE {identifier(first_table)}(id INTEGER PRIMARY KEY)")
+            database.execute(f"INSERT INTO {identifier(first_table)} VALUES (9)")
+            self.assertEqual(database.execute(record["sql"]).fetchall(), [(9,)])
+
+    def test_catalog_argument_file_transport_errors_are_arguments_failures(self):
+        invalid = [b"", b"SQLP-CATALOG-ARGS-2\n", b"SQLP-CATALOG-ARGS-1\n--column",
+                   b"SQLP-CATALOG-ARGS-1\n--column\0T\0\x80\0integer\0unique\0"]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.args"
+            for contents in invalid:
+                with self.subTest(contents=contents):
+                    path.write_bytes(contents)
+                    self.invoke("", ["--catalog-args-file", str(path)], code=2, stage="arguments")
+            self.invoke("", ["--catalog-args-file", str(path / "missing")], code=2, stage="arguments")
+            self.invoke("", ["--catalog-args-file", temporary], code=2, stage="arguments")
+
+    def test_catalog_argument_file_limits_bytes_and_tokens(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.args"
+            for contents, message in [
+                (b"SQLP-CATALOG-ARGS-1\n" + b"x" * (16 * 1024 * 1024), "16 MiB"),
+                (b"SQLP-CATALOG-ARGS-1\n" + b"x\0" * 100001, "100000 tokens"),
+            ]:
+                with self.subTest(message=message):
+                    path.write_bytes(contents)
+                    record = self.invoke("", ["--catalog-args-file", str(path)], code=2, stage="arguments")
+                    self.assertIn(message, record["error"]["message"])
+
+    def test_catalog_argument_file_keeps_catalog_semantic_failures(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.args"
+            for arguments in [[], CATALOG + ["--reference", "WROTE", "bad", "missing", "AUTHOR", "aid"]]:
+                self.argument_file(path, arguments)
+                self.invoke("SELECT a.name FROM AUTHOR a;", ["--catalog-args-file", str(path)],
+                            code=1, stage="catalog")
+
+    def test_catalog_argument_file_cannot_mix_flags_or_include_response_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "catalog.args"
+            self.argument_file(path, CATALOG)
+            for arguments in [["--catalog-args-file"], ["--catalog-args-file", str(path), *CATALOG],
+                              [*CATALOG, "--catalog-args-file", str(path)]]:
+                self.invoke("", arguments, code=2, stage="arguments")
+            for arguments in [["--catalog-args-file", str(path)], ["--help"]]:
+                self.argument_file(path, arguments)
+                self.invoke("", ["--catalog-args-file", str(path)], code=2, stage="arguments")
+
+    def test_sqlite_join_limit_counts_shared_bindings_not_path_occurrences(self):
+        args = ["--column", "T", "id", "integer", "unique",
+                "--column", "T", "fk", "integer", "nonunique",
+                "--reference", "T", "next", "fk", "T", "id",
+                "--reference", "T", "alternate", "fk", "T", "id"]
+        path = "t." + "next." * 63 + "id"
+        record = self.invoke(f"SELECT {path}, {path} FROM T t WHERE {path} = 1;", args)
+        self.assertEqual(len(record["trace"]["joins"]), 63)
+        self.assertEqual([len(p["join_ids"]) for p in record["trace"]["paths"]], [63, 63, 63])
+        with sqlite3.connect(":memory:") as database:
+            database.execute("CREATE TABLE T(id INTEGER PRIMARY KEY, fk INTEGER NOT NULL)")
+            database.execute("INSERT INTO T VALUES (1, 1)")
+            self.assertEqual(database.execute(record["sql"], self.parameters(record)).fetchall(), [(1, 1)])
+        for query in [f"SELECT t.next.{path[2:]} FROM T t;",
+                      f"SELECT {path} FROM T t WHERE t.next.{path[2:]} = 1;",
+                      f"SELECT {path}, t.alternate.id FROM T t;"]:
+            with self.subTest(query=query):
+                rejected = self.invoke(query, args, code=1, stage="compiler")
+                self.assertIn("63 reference joins", rejected["error"]["message"])
+
+    def test_sqlite_projection_limit(self):
+        projections = ", ".join(["a.aid"] * 2000)
+        record = self.invoke(f"SELECT {projections} FROM AUTHOR a;")
+        with sqlite3.connect(":memory:") as database:
+            database.execute("CREATE TABLE AUTHOR(aid INTEGER PRIMARY KEY)")
+            database.execute("INSERT INTO AUTHOR VALUES (7)")
+            self.assertEqual(database.execute(record["sql"]).fetchall(), [tuple([7] * 2000)])
+        rejected = self.invoke(f"SELECT {projections}, a.aid FROM AUTHOR a;", code=1, stage="compiler")
+        self.assertIn("2000 projections", rejected["error"]["message"])
+
+    def test_sqlite_predicate_limit(self):
+        predicates = " AND ".join(["a.aid = 1"] * 512)
+        record = self.invoke(f"SELECT a.aid FROM AUTHOR a WHERE {predicates};")
+        self.assertEqual(self.parameters(record), [1] * 512)
+        with sqlite3.connect(":memory:") as database:
+            database.execute("CREATE TABLE AUTHOR(aid INTEGER PRIMARY KEY)")
+            database.execute("INSERT INTO AUTHOR VALUES (1)")
+            self.assertEqual(database.execute(record["sql"], self.parameters(record)).fetchall(), [(1,)])
+        rejected = self.invoke(f"SELECT a.aid FROM AUTHOR a WHERE {predicates} AND a.aid = 1;",
+                               code=1, stage="compiler")
+        self.assertIn("512 equality predicates", rejected["error"]["message"])
 
     def test_catalog_errors_including_unused_references(self):
         for args in [[], ["--column", "", "id", "integer", "unique"],

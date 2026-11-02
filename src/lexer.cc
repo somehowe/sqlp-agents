@@ -48,11 +48,13 @@ const SourceLocation &LexerError::location() const noexcept {
 Lexer::Lexer(std::string input) : input_{std::move(input)} {}
 
 bool Lexer::at_end() const {
-    return position_.offset == input_.size();
+    // Moving a partially consumed lexer can empty its input while retaining
+    // the old position. Such a moved-from lexer is safely exhausted.
+    return position_.offset >= input_.size();
 }
 
 char Lexer::peek(std::size_t lookahead) const {
-    if (lookahead >= input_.size() - position_.offset) {
+    if (position_.offset >= input_.size() || lookahead >= input_.size() - position_.offset) {
         return '\0';
     }
     return input_[position_.offset + lookahead];
