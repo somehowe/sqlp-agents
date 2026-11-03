@@ -1,0 +1,49 @@
+name: Offline checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: offline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    name: Compiler, runner, and viewer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends g++ make bison
+
+      - name: Check runtime versions
+        run: |
+          python3 --version
+          node --version
+          bison --version
+
+      - name: Build and run offline tests
+        run: make -j2 all test
+
+      - name: Exercise the complete offline example
+        run: python3 -m tools.offline_example build/ci-example
+
+      - name: Check viewer against generated records
+        run: |
+          node tests/viewer_test.js build/ci-example/demo/prepared-report.json
+          node tests/viewer_test.js build/ci-example/demo/deliberate-report.json
+          node tests/viewer_test.js build/ci-example/replay-report.json
