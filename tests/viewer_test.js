@@ -87,11 +87,26 @@ test("saved report records render their recorded matches and available paths", (
     assert.ok(metric);
     assert.equal(metric.childNodes[1].textContent, expected);
   }
-  assert.match(document.nodes["origin-note"].textContent, /Hand-written/);
+  const originNotes = {manual: /Hand-written/, replay: /not a new model run/,
+    dry_run: /Requests were planned/, live: /does not authenticate/};
+  assert.match(document.nodes["origin-note"].textContent, originNotes[value.origin]);
   assert.equal(descendants(document.nodes.comparison).filter(node => node.tagName === "article").length, 2);
   const firstSqlp = value.cases[0].runs.find(run => run.language === "sqlp");
   const hasPaths = Boolean(firstSqlp && firstSqlp.trace && firstSqlp.trace.paths.length);
   assert.equal(descendants(document.nodes.comparison).some(node => node.className === "path-select"), hasPaths);
+  // Actual generated reports exercise every question, not only the first row.
+  for (let index = 0; index < value.cases.length; index++) {
+    document.nodes["case-select"].value = String(index);
+    document.nodes["case-select"].onchange();
+    for (const run of value.cases[index].runs) {
+      assert.ok(document.nodes.comparison.textContent.includes(run.query));
+      if (run.generation && run.generation.raw_response) {
+        assert.ok(viewer.requestFor(value, value.cases[index].id, run).request);
+        const responseId = run.generation.raw_response.id;
+        if (typeof responseId === "string") assert.ok(document.nodes.comparison.textContent.includes(responseId));
+      }
+    }
+  }
 });
 
 test("all origins remain distinguishable and invalid origin cannot load", () => {
