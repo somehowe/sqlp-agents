@@ -1,6 +1,6 @@
 # Agent context — SQLP for AI Agents
 
-Updated November 2, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
+Updated November 3, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
 
 ## Current direction and context
 
@@ -36,7 +36,7 @@ The Python runner orchestrates execution; the local viewer consumes its saved re
 
 ## Actual code at this update
 
-Verified November 2: the full configured `make test` passes all C++ suites, 250 Python tests, and 1,200 differential queries against an independent path oracle. Eight NatSQL integration tests require the optional pinned environment and otherwise skip; the core tests need no model access. Optional viewer and sanitizer targets are documented below. The six-case academic fixture and 42-question Chinook workload pass prepared-query checks. These are implementation checks, not AI results. Recheck the working tree before assigning unfinished work.
+Verified November 3 from a fresh copy of public repository files: `make -j2 all test` passes the C++ suites and discovers 255 Python tests, with ten optional tests skipped (eight NatSQL, one downloaded Chinook integration, one tokenizer integration). It also passes 1,200 differential queries against an independent path oracle. The earlier configured environment passed the optional integrations. The core checks need no model access or private resources. The six-case academic fixture and 42-question Chinook workload pass prepared-query checks. These are implementation checks, not AI results. Recheck the working tree before assigning unfinished work.
 
 The viewer's 23 Node checks pass, including actual ARM artifacts. Two local frozen
 kits are available at `build/experiment-ready-2026-11-02/` and
@@ -46,6 +46,13 @@ replay through their copied runtimes, analysis, and viewer also passes, with
 unknown usage and explicit synthetic labels. These generated paths are ignored;
 use [EXPERIMENT_KIT.md](EXPERIMENT_KIT.md) to reproduce them. No rendered browser
 check or actual model experiment has been performed.
+
+The [complete offline example](OFFLINE_EXAMPLE.md) now reproduces the academic
+demo, freezes its runtime, plans twelve requests, replays explicitly synthetic
+reference responses, and analyzes them with unknown usage. The viewer checks
+all its generated prepared, deliberate-mistake, and replay cases. The workflow
+under `.github/workflows/offline-checks.yml` runs these checks for pull requests
+and pushes to `main`; no API credentials are supplied.
 
 | Files | Present behavior |
 |---|---|
@@ -68,6 +75,7 @@ check or actual model experiment has been performed.
 | `tools/benchmark_prepared.py` | Counterbalanced offline execution/compiler timings, prepared source sizes, and optional static token counts using a pinned local vocabulary. These are not model usage. See [OFFLINE_BENCHMARKS.md](OFFLINE_BENCHMARKS.md). |
 | `tools/natsql_adapter.py` | Optional isolated official NatSQL converter, with reviewed structural schema export and explicit compatibility limits. Not a third condition in the paired model runner. See [NATSQL.md](NATSQL.md). |
 | `tools/create_demo.py`, `web/` | Creates fresh reference/deliberate-mistake records and displays saved reports locally with exact answers, usage, and interactive path mappings. No model/backend calls in the viewer. See [VIEWER.md](VIEWER.md). |
+| `tools/offline_example.py` | One command creates demo records, freezes a kit, plans requests, executes synthetic replay through its copied runtime, and analyzes the resulting records. See [OFFLINE_EXAMPLE.md](OFFLINE_EXAMPLE.md). |
 | `examples/academic/` | Fictional development fixture, catalog, and six manually prepared paired-query cases. Covers multi-hop roles, duplicate rows, and a finite mentor cycle. Not a held-out benchmark or model result. |
 | `src/main.cc` | Constructs and prints `w.author.name`. It does not compile text. |
 | `tests/` | C++ path/mapping/SQL/query/lexer/parser suites and Python CLI integration tests with standard-library SQLite. Legacy Test 10 still demonstrates manual SQL rendering. |

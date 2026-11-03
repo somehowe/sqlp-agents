@@ -132,10 +132,14 @@ Optional regression checks require Node.js 18+ with no packages:
 ```bash
 node tests/viewer_test.js
 node tests/viewer_test.js build/academic-comparison.json
+node tests/viewer_test.js build/offline-example/replay-report.json
 node tests/viewer_test.js build/arm-offline-2026-11-02/prepared-report.json build/arm-offline-2026-11-02/mapping-artifact.json
 ```
 
-The second command additionally exercises a real prepared report as input.
+The second command exercises an actual prepared report as input; the third
+exercises the synthetic report from [the complete offline example](OFFLINE_EXAMPLE.md).
+The optional report check selects every recorded question and verifies its
+source queries and any associated saved response, preserving the origin label.
 Tests cover validation, exact values, origin/usage labels, path selection,
 markup-as-text, file errors, and asynchronous selection races using a small DOM
 stub. The 23 checks also cover request/raw-usage inspection, mismatched or
