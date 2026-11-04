@@ -83,6 +83,7 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/demo_test.py
 	python3 tests/offline_example_test.py
 	python3 tests/experiment_kit_test.py
+	python3 tests/review_packet_test.py
 	python3 tests/benchmark_test.py
 	python3 tests/natsql_test.py
 	python3 tests/differential_test.py

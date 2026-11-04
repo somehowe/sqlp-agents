@@ -1,6 +1,6 @@
 # Agent context — SQLP for AI Agents
 
-Updated November 3, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
+Updated November 4, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
 
 ## Current direction and context
 
@@ -36,7 +36,7 @@ The Python runner orchestrates execution; the local viewer consumes its saved re
 
 ## Actual code at this update
 
-Verified November 3 from a fresh copy of public repository files: `make -j2 all test` passes the C++ suites and discovers 255 Python tests, with ten optional tests skipped (eight NatSQL, one downloaded Chinook integration, one tokenizer integration). It also passes 1,200 differential queries against an independent path oracle. The earlier configured environment passed the optional integrations. The core checks need no model access or private resources. The six-case academic fixture and 42-question Chinook workload pass prepared-query checks. These are implementation checks, not AI results. Recheck the working tree before assigning unfinished work.
+Verified November 4: `make -j2 all test` passes the C++ suites and discovers 264 Python tests, with eight optional NatSQL integrations skipped locally. A fresh checkout additionally skips the separately downloaded Chinook and tokenizer integrations (ten optional skips total). It also passes 1,200 differential queries against an independent path oracle. The earlier configured environment passed the optional integrations. The core checks need no model access or private resources. The six-case academic fixture and 42-question Chinook workload pass prepared-query checks. These are implementation checks, not AI results. Recheck the working tree before assigning unfinished work.
 
 The viewer's 23 Node checks pass, including actual ARM artifacts. Two local frozen
 kits are available at `build/experiment-ready-2026-11-02/` and
@@ -53,6 +53,15 @@ reference responses, and analyzes them with unknown usage. The viewer checks
 all its generated prepared, deliberate-mistake, and replay cases. The workflow
 under `.github/workflows/offline-checks.yml` runs these checks for pull requests
 and pushes to `main`; no API credentials are supplied.
+
+The [review-packet exporter](REVIEW_PACKET.md) copies a kit's selected questions,
+database, catalog, reference queries, compiler paths, and complete typed answers
+into a private portable folder. Its Markdown preview counts duplicate rows;
+the editable CSV starts blank. Status checking binds annotations to the case
+hashes and can compare the full packet against its original kit. This records
+notes, not authenticated review or model evidence. Local Chinook packets under
+`build/question-review-2026-11-04/` cover 12 development and 30 reserved questions;
+their human-review status remains pending.
 
 | Files | Present behavior |
 |---|---|
@@ -72,6 +81,7 @@ and pushes to `main`; no API credentials are supplied.
 | `tools/compiler_catalog.py` | Private bounded catalog argument files shared by both runners; avoids OS argv limits while keeping the JSON catalog semantics unchanged. |
 | `tools/analyze_runs.py` | Descriptive paired correctness, failures, token totals/distributions and known-pair deltas; rejects incomplete or inconsistent batches. See [ANALYSIS.md](ANALYSIS.md). |
 | `tools/experiment_kit.py` | Freeze and verify data/compiler/source/guides/questions and private scoring material; produce exact dry-run requests from the copied runtime. No API calls. See [EXPERIMENT_KIT.md](EXPERIMENT_KIT.md). |
+| `tools/review_packet.py` | Export a portable question/answer packet for a person's review; validate immutable artifacts and editable case-bound CSV notes. See [REVIEW_PACKET.md](REVIEW_PACKET.md). |
 | `tools/benchmark_prepared.py` | Counterbalanced offline execution/compiler timings, prepared source sizes, and optional static token counts using a pinned local vocabulary. These are not model usage. See [OFFLINE_BENCHMARKS.md](OFFLINE_BENCHMARKS.md). |
 | `tools/natsql_adapter.py` | Optional isolated official NatSQL converter, with reviewed structural schema export and explicit compatibility limits. Not a third condition in the paired model runner. See [NATSQL.md](NATSQL.md). |
 | `tools/create_demo.py`, `web/` | Creates fresh reference/deliberate-mistake records and displays saved reports locally with exact answers, usage, and interactive path mappings. No model/backend calls in the viewer. See [VIEWER.md](VIEWER.md). |
@@ -107,7 +117,7 @@ Requirements are GNU Make 4.3+, a C++20-capable `g++`, and Bison 3.8+. `make` bu
 The object compiler, tokenizer, and Bison parser are implemented. Trace `tests/parser_test.cc` from SQLP text through `parse_query` and `compile_sqlp`. `Query.distinct` defaults to false; `std::optional` represents absent projection aliases; `SqlValue` preserves string/int64 types. `Query.where` is now a vector of `EqualityPredicate`, replacing the old optional single predicate; an empty vector omits WHERE. The prototype caps compilation at 63 distinct reference joins, 2,000 projections, and 512 equalities to stay within the tested SQLite profile. Conditions and parameters retain source order, and every term is validated. Tokens own their text and carry start/exclusive-end locations: zero-based byte offsets and one-based byte columns, with CRLF as one line break. Lexical failures propagate as `LexerError`; grammar failures use `ParseError`. Name/type errors still come from `compile_query` without source locations.
 
 1. Ryan should trace one parser test and one saved SQLP run end to end, then explain the AST, role-specific joins, parameters, and scoring. The compiler is already multi-hop; do not repeat completed grammar work.
-2. Review the Chinook questions/answer plans and frozen kit, then choose model/access/spending. The user explicitly wants no model API use until they provide access later. Inspect a dry-run plan first; never send prepared queries/gold rows. Use [MODEL_PILOT.md](MODEL_PILOT.md). The development fixture and offline replay are not a study.
+2. Review the Chinook questions/answer plans and frozen kit, then choose model/access/spending. Use [the review packet](REVIEW_PACKET.md) for readable questions, paths, and answer bags; the separate Python oracle plans still need their own inspection. The user explicitly wants no model API use until they provide access later. Inspect a dry-run plan first; never send prepared queries/gold rows. Use [MODEL_PILOT.md](MODEL_PILOT.md). The development fixture and offline replay are not a study.
 3. Once access is supplied, run a small real paired development pilot, inspect failures/usage, and freeze the query language/guides. The restricted ARM layer is already implemented; review its assumptions rather than rebuilding it. Use the viewer/analyzer for inspection; extra grammar/native execution is lower priority. Large catalogs use bounded argument files; prompts and data still need explicit size limits.
 
 Lexer conventions: bare identifiers use ASCII letters/underscore followed by letters/digits/underscore; double quotes allow other identifier characters. Strings use single quotes; repeated delimiters escape a quote and backslashes are literal. Decimal int64 values may have an adjacent minus sign. Plus signs, fractional/exponent/hex forms, empty quoted identifiers, embedded NULs, and unterminated quotes/comments are rejected. Line comments (`--`) and non-nested block comments (`/* ... */`) are skipped. Lexical acceptance does not imply that syntax or semantics are supported.
@@ -201,10 +211,10 @@ The offline Chinook microbenchmark found shorter SQLP prepared queries (35.9% fe
 | Nov 1 | Multi-hop compiler, checked development fixture, offline pilot/replay, local viewer, and descriptive analysis. Real model results remain open. |
 | Nov 4 | Review frozen offline inputs, question meanings, and ARM mappings; choose model/access/budget when available. |
 | Nov 7 | Run a real development pilot if access is supplied; inspect failures and freeze syntax/guides. Decide whether a matched NatSQL condition is feasible. |
-| Nov 9 | Human mapping/demo walkthrough and proposed mentor review of outline/architecture/actual evidence; not an official outline deadline. |
+| Nov 9 | Working four-page draft and mapping/demo walkthrough for the internal mentor target Ryan reported; confirm availability. Not an official conference outline deadline. |
 | Nov 11 | Independent answer checks and held-out workload/settings freeze, including any accepted mappings/views and equal SQL access. |
 | Nov 14 | Nov 12–14 main comparison and initial analysis complete; connected demo. |
-| Nov 18 | First complete four-page draft. |
+| Nov 18 | Revise the working draft around the main comparison's actual results and reviewed demonstration. |
 | Nov 21 | Reviewed paper, reproducible artifact, rehearsal, and video. |
 | Nov 22 | Internal submission target; Nov 23 is the official demo deadline and contingency. |
 

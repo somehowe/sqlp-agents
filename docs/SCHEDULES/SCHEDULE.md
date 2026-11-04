@@ -1,6 +1,6 @@
 # Delivery schedule — SQLP for AI Agents
 
-Updated November 2, 2026. Goal: one interactive comparison and four-page ICDE
+Updated November 4, 2026. Goal: one interactive comparison and four-page ICDE
 demo paper. Required delivery assumes Ryan at 12–15 hours a week. Iris and Sam's
 plans are optional handoffs until their availability is confirmed; this does
 not settle authorship. The first Sunday checkpoint, November 1, has passed.
@@ -14,10 +14,10 @@ answer review, and a real pilot once the user provides model access.
 |---|---|
 | **Wed Nov 4** | Trace one question end to end; inspect the frozen kit and 12 development questions. Arrange a second human answer review and choose model/access/budget when available. |
 | **Sat Nov 7** | If access is ready, run the 12-question paired development pilot; inspect errors and actual usage. Freeze syntax/guides. Decide whether NatSQL has a fair, feasible common profile. |
-| **Mon Nov 9** | Walk through the ARM mappings and saved-run demo with Enamul if available. Review the outline and actual evidence. This is an internal target, not a conference outline deadline. |
+| **Mon Nov 9** | Have a working four-page draft and ARM/saved-run demo ready for the internal mentor target Ryan reported. Confirm review availability. This is not an official conference outline deadline. |
 | **Wed Nov 11** | Finish human review; freeze data/catalog/views, question eligibility, expected answers, model/settings, and limits before reserved model calls. Refresh and verify the kit. |
 | **Sat Nov 14** | Finish the Nov 12–14 paired comparison and descriptive analysis. Inspect wrong answers, failures, and token totals. Load real records in the viewer. |
-| **Wed Nov 18** | Complete the four-page draft using actual results, architecture, audience interactions, and limitations. The current private draft contains offline observations only. |
+| **Wed Nov 18** | Revise the working four-page draft with actual main-comparison results, audience interactions, and limitations. The current private draft contains offline observations only. |
 | **Sat Nov 21** | Reproduce setup, reconcile every paper number with saved records, test in a real browser, rehearse, and record the encouraged video. |
 | **Sun Nov 22** | Contributors approve PDF/authorship; designated submitter aims to submit. Official deadline: **Nov 23, 11:59 pm AoE**. |
 
