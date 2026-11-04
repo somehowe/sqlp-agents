@@ -10,6 +10,11 @@ model calls. This makes the next model experiment reviewable and reproducible.
 answered anything, that tokens were measured, or that a second person reviewed
 the questions. `model_run_status` remains `not_started`; token usage is unknown.
 
+For the next human review, [export a review packet](REVIEW_PACKET.md). It contains
+readable questions/queries/paths, answer-bag previews, full typed answers, and a
+blank CSV for notes, bound to this kit's versions. It makes no model calls and
+does not certify that anyone has checked the workload.
+
 ## Prepare, verify, and plan
 
 First build the compiler and prepare a dataset. For the project-authored Chinook

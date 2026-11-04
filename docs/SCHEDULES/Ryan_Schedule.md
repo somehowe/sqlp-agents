@@ -1,14 +1,14 @@
 # Ryan's schedule
 
-Updated November 2, 2026. Budget 12–15 hours a week. The core compiler, runner,
+Updated November 4, 2026. Budget 12–15 hours a week. The core compiler, runner,
 viewer, restricted ARM mappings, and offline workload now work. I should spend
 my next block understanding and reviewing them rather than rebuilding them.
 
 | Due, 2026 | What I should have done |
 |---|---|
-| **Wed Nov 4** | Trace one SQLP question through AST → joins → SQLite → checked record. Inspect development questions and kit payloads. Arrange a second human answer review; choose model/access/budget when ready. |
+| **Wed Nov 4** | Trace one SQLP question through AST → joins → SQLite → checked record. Use the new review packet to inspect development questions and arrange a second human answer review; choose model/access/budget when ready. |
 | **Sat Nov 7** | Once access is supplied, run the paired development pilot and inspect failures/usage. Freeze syntax/guides. Decide whether a matched NatSQL condition fits the time and scope. |
-| **Mon Nov 9** | Explain the ARM entity/key/role mappings, generated views, and query trace to Enamul if available. Review outline and actual pilot/offline evidence. |
+| **Mon Nov 9** | Have the working four-page draft and ARM/demo walkthrough ready for the internal mentor target Ryan reported. Use actual pilot/offline evidence and confirm review availability. |
 | **Wed Nov 11** | Finish human answer review; freeze reserved workload, data/views/catalog, settings, and limits. Verify a fresh kit before reserved calls. |
 | **Sat Nov 14** | Complete paired runs and analysis. Inspect wrong answers and usage, then load real records in the viewer. |
 | **Wed Nov 18** | Finish four-page draft/figure with claims tied to saved evidence. Keep paper files local. |
@@ -25,3 +25,4 @@ Full ARM identity reasoning, a native executor, discovery, and extra syntax stay
 outside this deadline. If access/review slips, revise scope before adding work.
 
 [Shared checkpoints](SCHEDULE.md) · [Experiment kit](../EXPERIMENT_KIT.md)
+· [Question review](../REVIEW_PACKET.md)
