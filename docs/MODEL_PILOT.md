@@ -83,8 +83,8 @@ including WAL pages. Default snapshot size is capped at 64 MiB. Use a bounded
 frozen dataset and deterministic tables/views. The study database must contain
 only approved data, with no gold-answer or unrelated private tables: SQL reads
 are not currently restricted to catalog tables/columns. The read-only authorizer
-prevents writes; it is not a catalog access policy. The current workload format is
-explicitly labels `scope: "development"` or `"held_out"` and preserves that label.
+prevents writes; it is not a catalog access policy. Each workload explicitly
+labels its `scope` as `"development"` or `"held_out"`; the report preserves it.
 A reserved file alone does not establish a reviewed held-out protocol: freeze
 question eligibility, human-checked answers, guides, model/settings, and limits
 before the first held-out call.

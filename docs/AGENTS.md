@@ -1,6 +1,6 @@
 # Agent context — SQLP for AI Agents
 
-Updated November 4, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
+Updated November 5, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
 
 ## Current direction and context
 
@@ -10,7 +10,7 @@ Build one SQLP-to-SQL compiler written in C++, one reproducible agent comparison
 
 The same model generates SQL and SQLP in separate conditions. The C++ compiler translates SQLP into SQL and parameters. SQLite executes both against the same data. The runner checks independently prepared answers and records prompts, attempts, results, diagnostics, and token usage. The website makes those records and path translations inspectable.
 
-Ryan is learning C++ while working on this research project with mentor Enamul Haque, supervisor Grant Weddell, and teammates Iris Mo and Samridh Sood. Ryan has since reported that Iris and Sam may no longer participate actively; plan required delivery around Ryan until their availability is confirmed. This does not decide authorship or erase earlier contributions. Enamul does not require a native executor. He has offered writing help; do not assume he has approved every detail or accepted an assigned deadline.
+Ryan is learning C++ while working on this research project with mentor Enamul Haque, supervisor Grant Weddell, and teammates Iris Mo and Samridh Sood. Ryan's latest update says Sam is planning a separate paper, while Iris has discussed a possible data-lake extension. Required delivery here currently rests with Ryan; agree on any additional contributions rather than assuming availability. This does not decide authorship or erase earlier contributions. Enamul does not require a native executor. He has offered writing help; do not assume he has approved every detail or accepted an assigned deadline.
 
 The current user request and actual code take precedence over dated planning notes. [IDEA.md](IDEA.md) is the short team overview. This file contains the working context; the [shared schedule](SCHEDULES/SCHEDULE.md) and individual schedules contain proposed delivery dates.
 
@@ -19,8 +19,8 @@ The current user request and actual code take precedence over dated planning not
 | Person | Owns | Weekly time |
 |---|---|---|
 | Ryan | Required delivery: compiler, pilot/evaluation, thin demo, paper | 12–15 hours |
-| Iris | Previous runner/evaluation role; optional help with independent answer review | Availability unconfirmed |
-| Samridh | Previous website/demo role; optional help with record viewer | Availability unconfirmed |
+| Iris | Considering a data-lake extension; any answer-review help here needs agreement | Availability unconfirmed |
+| Samridh | Planning a separate paper; previous demo role is an optional handoff only | No required tasks here |
 
 The Python runner orchestrates execution; the local viewer consumes its saved records. Seek a second human check of study answers from an available collaborator or mentor. Do not assume an AI-generated answer is independently reviewed research gold. Task ownership does not settle publication author order.
 
@@ -122,7 +122,9 @@ The object compiler, tokenizer, and Bison parser are implemented. Trace `tests/p
 
 Lexer conventions: bare identifiers use ASCII letters/underscore followed by letters/digits/underscore; double quotes allow other identifier characters. Strings use single quotes; repeated delimiters escape a quote and backslashes are literal. Decimal int64 values may have an adjacent minus sign. Plus signs, fractional/exponent/hex forms, empty quoted identifiers, embedded NULs, and unterminated quotes/comments are rejected. Line comments (`--`) and non-nested block comments (`/* ... */`) are skipped. Lexical acceptance does not imply that syntax or semantics are supported.
 
-These are incremental tasks, not authorization to implement the entire sequence unattended. For Ryan's next block, select the smallest useful unfinished step after reading the current code.
+For a learning block, trace a concrete example before extending it. For an
+explicit autonomous-work request, choose a useful unfinished increment from the
+current code and deliver it within the user's authorized scope.
 
 ## Implemented ARM mapping/view subset
 
@@ -174,11 +176,11 @@ Agree on examples before independently building formats:
 - **Catalog:** versioned table/column types and named references with physical source/target columns and validated assumptions. Both conditions receive equivalent facts.
 - **Compiler:** SQLP text plus catalog in; SQL, ordered typed parameters, minimal path-to-join mappings, or structured diagnostics out. It does not execute SQL.
 - **Runner:** question/condition in; saved model/version/settings, guides, data/catalog versions, source query, compiled SQL, parameters, rows, errors, token usage, and timing out.
-- **Website:** consumes these records. Start with labeled sample records, then real saved runs, then a thin local connection for live runs. A C++ HTTP server or compiler daemon is unnecessary for the first release.
+- **Website:** the implemented local viewer consumes saved records, including queries, answers, usage, raw requests/responses, and path mappings. A live generation interface is optional and unimplemented.
 
-Keep int64 values exact across JSON, using an agreed lossless representation. Python's SQLite adapter is the planned execution route. A direct C++ SQLite wrapper is not needed for the compiler milestone.
+Keep int64 values exact across JSON, using the existing lossless representation. Python's SQLite adapter supplies execution. A direct C++ SQLite wrapper is outside the required compiler scope.
 
-The implemented CLI encodes both string and int64 parameter values as JSON strings, with a separate `type` field. The runner converts `int64` values to Python integers before binding. Successful responses now include additive `trace.joins` and `trace.paths` fields; consumers should ignore unknown fields. Error responses contain no partial trace. Catalog flags are a provisional handoff to review, not a finalized dataset format. CLI catalog failures are setup errors and must be treated consistently across SQL/SQLP conditions, separately from query failures. See [COMPILER_CLI.md](COMPILER_CLI.md) for the full contract and exit codes.
+The implemented CLI encodes both string and int64 parameter values as JSON strings, with a separate `type` field. The runner converts `int64` values to Python integers before binding. Successful responses include `trace.joins` and `trace.paths`; consumers should ignore unknown fields. Error responses contain no partial trace. Runners accept version-1 JSON catalogs and transport their compiler arguments through private files. CLI catalog failures are setup errors and must be treated consistently across SQL/SQLP conditions, separately from query failures. See [COMPILER_CLI.md](COMPILER_CLI.md) for the full contract and exit codes.
 
 Both runners use private catalog argument files. The pilot smoke-compiles a direct-column query before provider calls, freezes a private compiler binary copy, holds one read transaction, hashes the serialized snapshot including WAL pages, excludes gold from requests, and journals responses before scoring. Refusals/incomplete/empty outputs are failed attempts; provider/protocol failures and returned-model drift abort the pilot. Usage missing from any attempt makes the condition total unknown, not zero. Replay is labeled separately from live calls.
 
@@ -213,12 +215,17 @@ The offline Chinook microbenchmark found shorter SQLP prepared queries (35.9% fe
 | Nov 7 | Run a real development pilot if access is supplied; inspect failures and freeze syntax/guides. Decide whether a matched NatSQL condition is feasible. |
 | Nov 9 | Working four-page draft and mapping/demo walkthrough for the internal mentor target Ryan reported; confirm availability. Not an official conference outline deadline. |
 | Nov 11 | Independent answer checks and held-out workload/settings freeze, including any accepted mappings/views and equal SQL access. |
-| Nov 14 | Nov 12–14 main comparison and initial analysis complete; connected demo. |
+| Nov 14 | Nov 12–14 main comparison and initial analysis complete; viewer displays real comparison records. Live generation remains optional. |
 | Nov 18 | Revise the working draft around the main comparison's actual results and reviewed demonstration. |
 | Nov 21 | Reviewed paper, reproducible artifact, rehearsal, and video. |
 | Nov 22 | Internal submission target; Nov 23 is the official demo deadline and contingency. |
 
 The ICDE demo paper uses IEEE format, four pages including references. It must explain motivation, architecture/core techniques, novelty/significance, scenarios, and audience interaction. Video is encouraged, at most five minutes/50 MB. Future submission should follow the then-current call, including AI-use disclosure. A polished website alone does not supply research evidence.
+
+The [demo CFP](https://icde2027.github.io/cf-demonstrations.html) lists Nov 23 at
+11:59 pm AoE, while the [general dates page](https://icde2027.github.io/important-dates.html)
+says 5 pm Pacific. Keep the internal Nov 22 target and confirm the portal's
+actual cutoff before submission.
 
 The separate UR2PhD Part 1 assignment requests a section titled “Research context and problem statement”: motivation, related work/limitations, and a concise research problem. It does not prescribe IEEE format; IEEE is used to prepare for ICDE. Preserve/revise earlier substantive writing rather than erase its history. Its Canvas deadline/group number must be checked separately. The current course draft has no results.
 

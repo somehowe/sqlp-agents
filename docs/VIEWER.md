@@ -19,7 +19,7 @@ the network. There are no package installs or frontend build steps. The classic
 script also supports opening `web/index.html` directly in browsers that permit
 local styles/scripts; the local server is the more consistent option.
 
-Create fresh demonstration data and two actual saved-run files:
+Create fresh demonstration data and two prepared-query reports:
 
 ```bash
 make
@@ -89,9 +89,9 @@ renamings, logical/physical reference equalities, and generated SQLite view DDL.
 Loading a mapping does not execute its SQL or change the comparison record.
 The ordinary comparison viewer works without one.
 
-For the current local example, choose
-`build/arm-offline-2026-11-02/mapping-artifact.json`, then its
-`prepared-report.json`. This prepared report has no catalog/snapshot manifest,
+Follow [the ARM example](ARM_MAPPING.md#example), then choose
+`build/arm-example/mapping-artifact.json` and
+`build/arm-example/prepared-report.json`. This prepared report has no catalog/snapshot manifest,
 so their association correctly remains **not verified** even though they were
 created together. Merely choosing two files does not verify their relationship.
 
@@ -112,7 +112,8 @@ file's data-check flag is displayed as a claim supplied by that file.
 
 ## Bounds and checks
 
-Files must be valid UTF-8 JSON, at most 16 MiB; individual text fields are capped at one million UTF-16 code units. The viewer checks supported record
+Files must be valid UTF-8 JSON, at most 16 MiB; individual text fields are capped
+at one million UTF-16 code units. The viewer checks supported record
 shapes, safe token counters, typed cells, row widths, and trace join chains before
 replacing the displayed record. It preserves a previous valid record if a new
 file fails to load. Untrusted text is inserted as text, never interpreted as HTML.
@@ -131,9 +132,9 @@ Optional regression checks require Node.js 18+ with no packages:
 
 ```bash
 node tests/viewer_test.js
-node tests/viewer_test.js build/academic-comparison.json
+node tests/viewer_test.js build/demo/prepared-report.json
 node tests/viewer_test.js build/offline-example/replay-report.json
-node tests/viewer_test.js build/arm-offline-2026-11-02/prepared-report.json build/arm-offline-2026-11-02/mapping-artifact.json
+node tests/viewer_test.js build/arm-example/prepared-report.json build/arm-example/mapping-artifact.json
 ```
 
 The second command exercises an actual prepared report as input; the third
@@ -144,5 +145,6 @@ Tests cover validation, exact values, origin/usage labels, path selection,
 markup-as-text, file errors, and asynchronous selection races using a small DOM
 stub. The 23 checks also cover request/raw-usage inspection, mismatched or
 ambiguous request hashes, Unicode catalog comparison, optional mapping records,
-and independent mapping-file reads. These checks do not replace visual browser testing; no browser automation
+and independent mapping-file reads. These checks do not replace visual browser
+testing; no browser automation
 engine was available during implementation.

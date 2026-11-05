@@ -49,7 +49,8 @@ Path('build/arm-example/catalog.json').write_text(json.dumps(artifact['catalog']
 PY
 make
 python3 -m tools.run_comparison build/arm-example/mapped.sqlite \
-  build/arm-example/catalog.json examples/arm/workload.json
+  build/arm-example/catalog.json examples/arm/workload.json \
+  > build/arm-example/prepared-report.json
 ```
 
 The three prepared development cases check competing author/publisher roles,

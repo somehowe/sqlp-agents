@@ -1,6 +1,6 @@
 # SQLP for AI Agents: Correctness and Token Efficiency
 
-The idea is to see how using SQLP affects an AI agent's query correctness and token usage. Someone asks a question through our website, and we run the same model separately with SQL and SQLP. We execute both against the same data and compare the answers and total tokens.
+The idea is to see how using SQLP affects an AI agent's query correctness and token usage. The runner gives the same model a question separately in SQL and SQLP conditions, executes both against the same data, and compares answers and total tokens. The current website opens saved comparison records; live question entry is a possible later extension.
 
 **Research question:** Given equivalent schema and relationship information, how does using SQLP instead of SQL affect AI agents' query correctness and total token usage?
 
@@ -35,10 +35,11 @@ The model still has to choose the right relationship. Following a paper's publis
 The C++ compiler translates SQLP. The Python runner calls the model, compiles
 SQLP, executes both conditions in SQLite, and checks answers. The [local viewer](VIEWER.md) displays those saved records and path-to-join mappings.
 
-The original roles were Ryan on the compiler, Iris on the runner, and Sam on
-the website. Their availability has changed, so the required plan currently
-assumes Ryan handling the required components. Help with reviewing answers or the viewer would still be
-valuable if they return. This is separate from deciding authorship.
+Ryan currently handles the required compiler, runner, and viewer work. Sam is
+planning a separate paper, and Iris has discussed a possible data-lake extension.
+Neither direction is implemented here. Help reviewing answers or the demo can
+still fit alongside those projects; specific tasks need agreement. This is
+separate from deciding authorship.
 
 ```mermaid
 flowchart TD
@@ -60,7 +61,13 @@ a path shows the exact tables and join columns it follows. This helps explain
 where the two attempts used different relationships. Live question entry can
 come later; the current viewer reads recorded runs.
 
-Prepared questions have expected answers checked against separate Python answer plans. We still need a person to review that the questions and answers mean what we intend. Arbitrary questions remain unscored until we know the correct answer. Agreement between SQL and SQLP alone doesn't prove correctness; both can be wrong.
+The Chinook prepared queries are checked against separate Python answer plans;
+the academic fixture uses manually prepared expected answers. We still need a
+person to review that the study questions and answers mean what we intend. The
+[review packets](REVIEW_PACKET.md) make those questions, paths, and answer bags
+readable and provide a blank notes sheet. Arbitrary questions remain unscored
+until we know the correct answer. Agreement between SQL and SQLP alone doesn't
+prove correctness; both can be wrong.
 
 ## How we test it
 
@@ -97,7 +104,8 @@ These are the same questions in two setups. Human answer review is still pending
 Chinook is not a data lake. **We supply approved relationships to both conditions**;
 automatic discovery remains a later extension.
 
-One offline observation is already useful: the prepared SQLP queries use fewer
-tokens, but its longer guide currently cancels that saving when we count the
-guide, task, and query together. Actual model usage and correctness could still
-go either way. That is what the real pilot will test.
+One offline observation is already useful: on the 12 Chinook development
+questions, a local tokenizer counted fewer tokens in the prepared SQLP queries,
+but the longer guide canceled that saving across guide, task, and query text.
+Those static counts are separate from actual model usage and correctness, which
+could still go either way. That is what the real pilot will test.

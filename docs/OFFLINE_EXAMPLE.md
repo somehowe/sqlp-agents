@@ -57,7 +57,7 @@ suites, creates this example, and checks the viewer against all three generated
 reports. It uses no model credentials or private resources. These are interface
 and execution checks, not visual browser tests or model experiments.
 
-A fresh checkout discovers 255 Python tests. Ten optional tests skip without
+A fresh checkout discovers 264 Python tests. Ten optional tests skip without
 the separately downloaded Chinook source, tokenizer vocabulary, and NatSQL
 environment. The standard-library tests and 23 Node viewer checks run without
 those extras. See [the compiler checks](COMPILER_CHECKS.md) for optional fuzzing.

@@ -1,6 +1,6 @@
 # Run a prepared SQL/SQLP comparison
 
-This is the execution and answer-checking foundation for the demo. It runs prepared queries, saves their actual SQLite answers and SQLP translations, and checks them against separately written expected rows. It makes no model calls. Records are labeled `origin: "manual"`, `scope: "development"`, with `token_usage: null`.
+This is the execution and answer-checking foundation for the demo. It runs prepared queries, saves their actual SQLite answers and SQLP translations, and checks them against separately written expected rows. It makes no model calls. Records are labeled `origin: "manual"`, preserve the workload's `scope`, and have `token_usage: null`.
 
 ## Run the academic example
 
@@ -20,12 +20,12 @@ The runner opens a read-only connection and starts a transaction before prefligh
 
 ## Workload and scoring
 
-The workload has `version: 1`, `scope: "development"`, and a nonempty `cases` list. Each case supplies:
+The workload has `version: 1`, `scope: "development"` or `"held_out"`, and a nonempty `cases` list. The academic example uses `development`. Each case supplies:
 
 - `id` and `question`.
 - `sql` and `sqlp`: prepared query text, preserved without repair or normalization.
 - `column_count`: expected projection width, including for empty answers.
-- `expected_rows`: manually prepared row lists. Cells can be null, strings, int64 numbers, or finite real numbers. Boolean gold values are rejected.
+- `expected_rows`: independently prepared row lists. Cells can be null, strings, int64 numbers, or finite real numbers. Boolean gold values are rejected.
 
 Scoring compares row values and duplicate counts, ignoring row order and column aliases. Column order and projection width matter. Numeric `1` and `1.0` compare equal; text `"1"` differs. Large integer comparisons retain precision. A single finite fixture cannot establish query equivalence, so prepare contrasting data and independently review answers before a real study.
 
@@ -39,9 +39,9 @@ Each case records its question, expected width/rows, and two `runs`, identified 
 - `columns`, typed `rows`, `status`, and `correct`.
 - An `error` for failed compilation/execution, and null `token_usage`.
 
-Cells use `{"type":"int64","value":"9007199254740993"}` for integers, `string` for text, `real` with a string value for floating-point output, `blob` with hexadecimal bytes, and `null` with a null value. This lets Sam's interface display exact values without JavaScript rounding large integers. Expected rows use the same output encoding.
+Cells use `{"type":"int64","value":"9007199254740993"}` for integers, `string` for text, `real` with a string value for floating-point output, `blob` with hexadecimal bytes, and `null` with a null value. This lets the viewer display exact values without JavaScript rounding large integers. Expected rows use the same output encoding.
 
-Sam can load `build/academic-comparison.json` as a recorded-run fixture. A SQLP trace maps each path to its physical joins; `correct` comes from expected rows, not agreement between the two conditions. Failed runs retain their diagnostics and have null rows, rather than pretending to return an empty answer.
+Load `build/academic-comparison.json` in the [local viewer](VIEWER.md). A SQLP trace maps each path to its physical joins; `correct` comes from expected rows, not agreement between the two conditions. Failed runs retain their diagnostics and have null rows, rather than pretending to return an empty answer.
 
 ## Limits and failure handling
 
