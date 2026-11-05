@@ -12,8 +12,8 @@ After [preparing Chinook](WORKLOAD.md), run from the repository root:
 
 ```bash
 make
-python3 -m tools.benchmark_prepared build/chinook/snapshot.sqlite \
-  build/chinook/catalog.json build/chinook/development.json \
+python3 -m tools.benchmark_prepared build/chinook-ready/snapshot.sqlite \
+  build/chinook-ready/catalog.json build/chinook-ready/development.json \
   --repetitions 7 --warmups 1 --seed 20261101 > build/chinook-microbenchmark.json
 python3 tests/benchmark_test.py
 ```

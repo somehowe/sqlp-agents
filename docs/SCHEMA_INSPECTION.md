@@ -1,10 +1,11 @@
 # Inspect source schemas
 
-This is the first preparation step for the restricted ARM mapping layer. It reads
+This is the first preparation step for the [restricted ARM mapping layer](ARM_MAPPING.md). It reads
 declared SQLite tables, primary keys, and foreign keys. It does not generate an
 ARM schema, assign relationship roles, create views, or resolve entity identity.
 
-From the repository root:
+First create `build/academic.sqlite` with the [dataset instructions](DATASET_CHECKS.md).
+Then, from the repository root:
 
 ```bash
 python3 -m tools.inspect_schema build/academic.sqlite > build/source-schema.json
@@ -24,7 +25,7 @@ The version-1 JSON report contains:
 - `excluded`: views, virtual tables, and virtual-table shadow tables.
 - `data_checked: false` and `review_required: true`.
 
-A table is a candidate for the planned subset when it has one declared,
+A table is a candidate for the supported mapping subset when it has one declared,
 non-null, integer/text primary-key column. SQLite's implicit non-null behavior
 for rowid-alias keys, STRICT tables, and WITHOUT ROWID tables is respected.
 `INTEGER PRIMARY KEY DESC` is not assumed to be a rowid alias. Keyless and

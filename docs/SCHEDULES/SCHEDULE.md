@@ -1,14 +1,17 @@
 # Delivery schedule — SQLP for AI Agents
 
-Updated November 4, 2026. Goal: one interactive comparison and four-page ICDE
-demo paper. Required delivery assumes Ryan at 12–15 hours a week. Iris and Sam's
-plans are optional handoffs until their availability is confirmed; this does
-not settle authorship. The first Sunday checkpoint, November 1, has passed.
+Updated November 5, 2026. Goal: one interactive comparison and four-page ICDE
+demo paper in this repository. Required delivery assumes Ryan at 12–15 hours a
+week. Sam is planning a separate paper, and Iris has discussed a data-lake
+extension. Their files here describe optional handoffs, not agreed assignments
+for those projects. This does not settle authorship.
 
 The compiler, SQLite runner, saved-record viewer, restricted ARM views, pinned
 Chinook workload, offline benchmarks, and frozen experiment kit now work. **No
 model results exist.** Current priorities are understanding the system, human
-answer review, and a real pilot once the user provides model access.
+answer review, and a real pilot once the user provides model access. The Nov 1
+and Nov 4 dates have passed: review packets are ready, while completed human
+answer review and a real model pilot remain open.
 
 | Due, 2026 | Concrete result |
 |---|---|
@@ -19,7 +22,7 @@ answer review, and a real pilot once the user provides model access.
 | **Sat Nov 14** | Finish the Nov 12–14 paired comparison and descriptive analysis. Inspect wrong answers, failures, and token totals. Load real records in the viewer. |
 | **Wed Nov 18** | Revise the working four-page draft with actual main-comparison results, audience interactions, and limitations. The current private draft contains offline observations only. |
 | **Sat Nov 21** | Reproduce setup, reconcile every paper number with saved records, test in a real browser, rehearse, and record the encouraged video. |
-| **Sun Nov 22** | Contributors approve PDF/authorship; designated submitter aims to submit. Official deadline: **Nov 23, 11:59 pm AoE**. |
+| **Sun Nov 22** | Contributors approve PDF/authorship; designated submitter aims to submit. The demo CFP lists **Nov 23, 11:59 pm AoE**; confirm the portal cutoff (see below). |
 
 Use one capable accessible model first. The workload has 12 development and 30
 reserved questions. Separate Python answer plans check the prepared queries;
@@ -42,9 +45,14 @@ Cut extra models, repairs, syntax, and animation before core review/writing.
 No API calls until the user supplies access. If the Nov 7 pilot or Nov 11 answer
 review slips, revise the submission scope with Enamul; do not relabel prepared
 queries or replay as model evidence. Paper files stay local under resources.
-Course assignments follow Canvas separately. The verified ICDE demo call asks
-for four IEEE pages including references and an interactive scenario; video is
-encouraged, at most five minutes/50 MB.
+Course assignments follow Canvas separately. The [ICDE demo call](https://icde2027.github.io/cf-demonstrations.html)
+asks for four IEEE pages including references and an interactive scenario;
+video is encouraged, at most five minutes/50 MB.
+
+The demo call specifies 11:59 pm AoE, while the [general dates page](https://icde2027.github.io/important-dates.html)
+says all deadlines are 5 pm Pacific. Both list Nov 23. Confirm the submission
+portal's cutoff before the final upload; the internal Nov 22 target precedes
+both published times.
 
 [Ryan](Ryan_Schedule.md) · [Iris](Iris_Schedule.md) · [Sam](Sam_Schedule.md) ·
 [Experiment kit](../EXPERIMENT_KIT.md) · [Context](../AGENTS.md)

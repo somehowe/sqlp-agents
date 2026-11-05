@@ -95,7 +95,7 @@ The `sql` field contains the complete generated SQL. Parameters follow the condi
 
 `trace.paths` records every path occurrence, SELECT first and then WHERE. `clause` is `select` or `where`; `index` is the zero-based position within that clause's projection/condition list. `root` and `features` preserve decoded path components; `column` identifies the final SQL column. Direct columns have empty `join_ids`. For the first example, the WHERE country path has features `["author","university","country"]` and join IDs `[0,1]`.
 
-Sam can use these records to show a path's reference roles and join columns. Keep component arrays intact: `["author.university","country"]` names a different path from `["author","university","country"]`. Names in the trace are unquoted; SQL identifiers are quoted in `sql`. Source-text spans and row provenance remain future work. Failed compilations return an error without a partial trace.
+The viewer uses these records to show a path's reference roles and join columns. Keep component arrays intact: `["author.university","country"]` names a different path from `["author","university","country"]`. Names in the trace are unquoted; SQL identifiers are quoted in `sql`. Source-text spans and row provenance remain future work. Failed compilations return an error without a partial trace.
 
 The trace is an additive version-1 field. Consumers should ignore unknown output fields; the existing SQL, parameter, and error formats are unchanged.
 

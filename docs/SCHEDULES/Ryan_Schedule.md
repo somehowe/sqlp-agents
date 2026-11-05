@@ -1,8 +1,10 @@
 # Ryan's schedule
 
-Updated November 4, 2026. Budget 12–15 hours a week. The core compiler, runner,
+Updated November 5, 2026. Budget 12–15 hours a week. The core compiler, runner,
 viewer, restricted ARM mappings, and offline workload now work. I should spend
 my next block understanding and reviewing them rather than rebuilding them.
+The Nov 4 review packets are ready; a completed second-person answer review and
+real model pilot are still pending.
 
 | Due, 2026 | What I should have done |
 |---|---|
