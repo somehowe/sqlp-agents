@@ -42,6 +42,11 @@ For another dataset, generate a report with [the prepared runner](QUERY_COMPARIS
 or [pilot](MODEL_PILOT.md), then choose that file. Dry-run plans and incomplete
 setup-error reports have no scored model attempts.
 
+On Ryan's checkout, the [November 6 live records](PILOT_RESULTS.md) are at
+`resources/experiments/2026-11-06/sol-seed0/report.json` and the other five batch
+folders. Open `luna-seed0/report.json` and select `ch-dev-12` to inspect a real
+wrong filter value alongside its successful compilation and empty answer.
+
 ## Walk through a case
 
 1. Choose a question. Compare the two source queries, recorded answers,

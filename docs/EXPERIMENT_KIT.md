@@ -8,7 +8,9 @@ model calls. This makes the next model experiment reviewable and reproducible.
 
 `offline_validated` means the prepared pairs passed. It does not mean a model
 answered anything, that tokens were measured, or that a second person reviewed
-the questions. `model_run_status` remains `not_started`; token usage is unknown.
+the questions. Preparation/verification keep `model_run_status: not_started`;
+subsequent live evidence belongs in separate reports, such as the
+[November 6 development pilot](PILOT_RESULTS.md).
 
 For the next human review, [export a review packet](REVIEW_PACKET.md). It contains
 readable questions/queries/paths, answer-bag previews, full typed answers, and a
@@ -28,15 +30,39 @@ python3 -m tools.experiment_kit prepare \
   --held-out build/chinook-ready/held_out.json
 python3 -m tools.experiment_kit verify build/experiment-001
 python3 -m tools.experiment_kit plan build/experiment-001 \
-  --scope development --model candidate-model --max-output-tokens 1024 --seed 0 \
+  --scope development --model gpt-6.1-sol --reasoning-effort high \
+  --max-output-tokens 8192 --seed 0 \
   > build/experiment-001-development-plan.json
 ```
 
-`candidate-model` is a recorded model label for the plan. Planning does not
-check account access, availability, price, or credentials. It always uses the
+`--model` records the model label for the plan. Planning does not check account
+access, availability, price, or credentials. It always uses the
 dry-run path. Review the generated payloads before choosing a real model run.
 `--scope held_out` prepares reserved requests with that scope preserved. There
 are two independent first-attempt requests per question, one for each language.
+Choose an effort supported by the model; the provider can reject unsupported
+values. The output cap includes reasoning tokens. Older kits retain their old
+runner, so prepare a new kit to use newly added CLI options.
+
+After reviewing the plan and authorizing spending, run the copied runtime. This
+example uses the 12-question Chinook development split and fresh output paths:
+
+```bash
+(
+  cd build/experiment-001/runtime
+  python3 -m tools.run_pilot ../data.sqlite ../public/catalog.json \
+    ../evaluation/development.json --compiler ../sqlpc \
+    --sql-guide ../public/guides/sql.md --sqlp-guide ../public/guides/sqlp.md \
+    --model gpt-6.1-sol --reasoning-effort high --max-output-tokens 8192 \
+    --live --api-key-file /home/ryanh/sql-p/resources/private/openai_api_key \
+    --max-requests 24 --journal ../../pilot-development-001.jsonl \
+    > ../../pilot-development-001.json
+)
+```
+
+The key file is read only in live mode; omitting it uses `OPENAI_API_KEY` from the
+environment. Request/output-token caps do not enforce a dollar budget. See the
+[pilot guide](MODEL_PILOT.md) for credential, usage, and failure handling.
 
 The `prepare` command accepts `--compiler` and optional `--mapping`. A mapping
 must be a materialized [ARM artifact](ARM_MAPPING.md) whose catalog and final
@@ -101,8 +127,8 @@ bundled; this is not a container image or a promise of identical behavior on
 every platform. Source Git metadata is recorded only when the source root is
 the actual Git root, avoiding an unrelated ancestor checkout in a copied kit.
 
-No dependency installation or API call is required for these commands. The
-default API limits are 1,000 answer rows, five seconds per query, thirty seconds
+Kit preparation, verification, and planning require no API call or dependency
+installation. Default limits are 1,000 answer rows, five seconds per query, thirty seconds
 for preflight, and a 64 MiB snapshot. JSON CLI failures return exit status 2.
 Before a real study, freeze model/settings, human answer review, eligibility,
 and spending separately. See [MODEL_PILOT.md](MODEL_PILOT.md) for generation and

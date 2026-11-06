@@ -15,7 +15,7 @@ import tempfile
 import time
 
 from .run_comparison import DEFAULT_COMPILER, SetupError, _check_workload, run_comparison
-from .run_pilot import ROOT, _public_catalog, _snapshot_hash, _source_manifest, digest
+from .run_pilot import ROOT, REASONING_EFFORTS, _public_catalog, _snapshot_hash, _source_manifest, digest
 from .validate_dataset import _unique_object, compiler_arguments, load_catalog, validate_dataset
 
 MAX_FILE_BYTES = 64 * 1024 * 1024
@@ -257,7 +257,9 @@ def verify_kit(directory):
             'directory': str(directory), 'splits': splits, 'model_run_status': 'not_started'}
 
 
-def plan_kit(directory, scope, *, model, max_output_tokens=1024, seed=0):
+def plan_kit(directory, scope, *, model, max_output_tokens=1024, seed=0, reasoning_effort=None):
+    if reasoning_effort is not None and reasoning_effort not in REASONING_EFFORTS:
+        raise ValueError('Unsupported reasoning effort')
     verified = verify_kit(directory)
     if scope not in verified['splits']:
         raise ValueError('Split not present in this kit')
@@ -271,6 +273,8 @@ def plan_kit(directory, scope, *, model, max_output_tokens=1024, seed=0):
                '--max-output-tokens', str(max_output_tokens), '--seed', str(seed),
                '--max-rows', str(limits['max_rows']), '--timeout', str(limits['timeout_seconds']),
                '--preflight-timeout', str(limits['preflight_timeout_seconds'])]
+    if reasoning_effort is not None:
+        command.extend(('--reasoning-effort', reasoning_effort))
     process = subprocess.run(command, cwd=directory/'runtime', capture_output=True, text=True,
                              encoding='utf-8', timeout=limits['preflight_timeout_seconds']+limits['timeout_seconds']+30)
     if process.returncode != 0:
@@ -294,6 +298,7 @@ def main():
     plan = commands.add_parser('plan'); plan.add_argument('directory', type=Path)
     plan.add_argument('--scope', choices=('development', 'held_out'), default='development')
     plan.add_argument('--model', required=True); plan.add_argument('--max-output-tokens', type=int, default=1024)
+    plan.add_argument('--reasoning-effort', choices=REASONING_EFFORTS)
     plan.add_argument('--seed', type=int, default=0)
     args = parser.parse_args()
     try:
@@ -307,7 +312,8 @@ def main():
             report = verify_kit(args.directory)
         else:
             report = plan_kit(args.directory, args.scope, model=args.model,
-                              max_output_tokens=args.max_output_tokens, seed=args.seed)
+                              max_output_tokens=args.max_output_tokens, seed=args.seed,
+                              reasoning_effort=args.reasoning_effort)
     except (OSError, ValueError, TypeError, KeyError, sqlite3.Error, subprocess.SubprocessError) as error:
         print(json.dumps({'version': 1, 'ok': False, 'error': {'stage': 'experiment_kit', 'message': str(error)}}, allow_nan=False))
         return 2

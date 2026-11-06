@@ -4,7 +4,7 @@ The idea is to see how using SQLP affects an AI agent's query correctness and to
 
 **Research question:** Given equivalent schema and relationship information, how does using SQLP instead of SQL affect AI agents' query correctness and total token usage?
 
-I think this gives us a concrete question while keeping the compiler work useful. SQLP could make joins easier to express, but models already know SQL and would need instructions for SQLP. We haven't run the comparison yet, so either approach could perform better.
+I think this gives us a concrete question while keeping the compiler work useful. SQLP could make joins easier to express, but models already know SQL and would need instructions for SQLP. Our [first development runs](PILOT_RESULTS.md) found shorter generated queries without lower total token usage. We still need reviewed answers and a reserved-question comparison before making a broader claim.
 
 ## How the joins work
 
@@ -94,8 +94,9 @@ layer in the study. See [ARM_MAPPING.md](ARM_MAPPING.md) for the exact subset.
 The compiler, prepared comparison, pilot/replay runner, viewer, analyzer, and
 restricted ARM layer work offline. An [experiment kit](EXPERIMENT_KIT.md) freezes
 their inputs and runtime, checks prepared answers, and produces exact requests
-without contacting a model. The live adapter exists, but we will wait for model
-access before using it. Prepared/replay runs are not AI results.
+without contacting a model. The live adapter has now been used for real paired
+development runs, with private credentials and matched model/reasoning settings.
+Prepared/replay runs remain separate from those actual model results.
 
 The current [workload](WORKLOAD.md) uses a pinned Chinook sample-store database:
 nine tables, 6,874 rows, 12 development questions, and 30 reserved questions.
@@ -107,5 +108,8 @@ automatic discovery remains a later extension.
 One offline observation is already useful: on the 12 Chinook development
 questions, a local tokenizer counted fewer tokens in the prepared SQLP queries,
 but the longer guide canceled that saving across guide, task, and query text.
-Those static counts are separate from actual model usage and correctness, which
-could still go either way. That is what the real pilot will test.
+Those static counts are separate from actual model usage. The real pilot also
+found that guide overhead outweighed shorter output on these questions. We also
+found an answer that matched the original data but failed when two albums shared
+a title. The next priority is checking question meanings and answers, then
+freezing the main comparison. See [the results and limitations](PILOT_RESULTS.md).

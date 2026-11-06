@@ -78,6 +78,7 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/chinook_test.py
 	python3 tests/comparison_test.py
 	python3 tests/model_provider_test.py
+	python3 tests/credentials_test.py
 	python3 tests/pilot_test.py
 	python3 tests/analysis_test.py
 	python3 tests/demo_test.py

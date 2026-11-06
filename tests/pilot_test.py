@@ -1,7 +1,9 @@
 """Paired first-attempt protocol tests; all model responses are offline fixtures."""
 
 from copy import deepcopy
+from contextlib import redirect_stdout
 import hashlib
+import io
 import json
 from pathlib import Path
 import shutil
@@ -113,6 +115,74 @@ class PilotTests(unittest.TestCase):
         for request in report["requests"]:
             self.assertEqual(request["request_sha256"], digest(request["payload"]))
         self.assertFalse(list(self.directory.glob("*.jsonl")))
+
+    def test_explicit_reasoning_is_bound_to_both_requests_without_changing_default_settings(self):
+        baseline = self.plan()
+        self.assertNotIn("reasoning", baseline["manifest"]["settings"])
+        settings = {**SETTINGS, "reasoning": {"effort": "max"}}
+        explicit = run_pilot(self.database, self.catalog, workload(), guides=self.guides,
+                             settings=settings)
+        self.assertEqual(explicit["manifest"]["settings"], settings)
+        for request in explicit["requests"]:
+            self.assertEqual(request["payload"]["reasoning"], {"effort": "max"})
+            self.assertEqual(request["request_sha256"], digest(request["payload"]))
+        self.assertNotEqual({item["request_sha256"] for item in baseline["requests"]},
+                            {item["request_sha256"] for item in explicit["requests"]})
+        for invalid in ("unknown", None, 3, ["high"]):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                pilot_module._settings({**SETTINGS, "reasoning": {"effort": invalid}})
+
+    def cli(self, *options):
+        tasks = self.directory / "tasks.json"
+        tasks.write_text(json.dumps(workload()))
+        arguments = ["tools.run_pilot", str(self.database),
+                     str(ROOT / "examples/academic/catalog.json"), str(tasks),
+                     "--model", SETTINGS["model"], *options]
+        output = io.StringIO()
+        with patch.object(sys, "argv", arguments), redirect_stdout(output):
+            status = pilot_module.main()
+        return status, json.loads(output.getvalue())
+
+    def test_cli_key_file_only_reads_in_live_mode_and_never_enters_requests(self):
+        path = self.directory / "private-key"
+        with patch.object(pilot_module, "load_api_key", return_value="dummy-file-key") as loader, \
+                patch.object(pilot_module, "OpenAIResponsesClient") as client, \
+                patch.object(pilot_module, "run_pilot", return_value={"ok": True}) as runner:
+            status, _ = self.cli("--live", "--api-key-file", str(path),
+                                 "--reasoning-effort", "high", "--max-output-tokens", "8192")
+        self.assertEqual(status, 0)
+        loader.assert_called_once_with(path)
+        client.assert_called_once_with("dummy-file-key", 60.0)
+        self.assertEqual(runner.call_args.kwargs["settings"], {
+            "model": SETTINGS["model"], "max_output_tokens": 8192,
+            "reasoning": {"effort": "high"}})
+        self.assertNotIn("dummy-file-key", str(runner.call_args))
+        self.assertNotIn(str(path), str(runner.call_args))
+
+    def test_cli_rejects_key_file_for_planning_or_replay_without_reading_it(self):
+        for mode in ((), ("--replay", "unread-replay.json")):
+            with self.subTest(mode=mode), \
+                    patch.object(pilot_module, "load_api_key") as loader, \
+                    patch.object(pilot_module, "OpenAIResponsesClient") as client, \
+                    patch.object(pilot_module, "run_pilot") as runner:
+                status, report = self.cli(*mode, "--api-key-file", "unread-credential")
+            self.assertEqual(status, 2)
+            self.assertIn("requires --live", report["error"]["message"])
+            loader.assert_not_called()
+            client.assert_not_called()
+            runner.assert_not_called()
+
+    def test_cli_environment_fallback_and_omitted_reasoning_preserve_existing_behavior(self):
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "dummy-environment-key"}), \
+                patch.object(pilot_module, "load_api_key") as loader, \
+                patch.object(pilot_module, "OpenAIResponsesClient") as client, \
+                patch.object(pilot_module, "run_pilot", return_value={"ok": True}) as runner:
+            status, _ = self.cli("--live")
+        self.assertEqual(status, 0)
+        loader.assert_not_called()
+        client.assert_called_once_with("dummy-environment-key", 60.0)
+        self.assertEqual(runner.call_args.kwargs["settings"], {
+            "model": SETTINGS["model"], "max_output_tokens": 1024})
 
     def test_exact_replay_scores_both_conditions_and_keeps_usage_raw_and_journal(self):
         plan = self.plan()

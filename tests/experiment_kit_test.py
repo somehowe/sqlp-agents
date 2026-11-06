@@ -298,6 +298,24 @@ class ExperimentKitTests(unittest.TestCase):
             self.assertNotIn('Databases', json.dumps(request['payload']))
         self.assertEqual(verify_kit(directory)['model_run_status'], 'not_started')
 
+    def test_frozen_plan_records_explicit_reasoning_on_both_arms(self):
+        directory, _ = self.prepare()
+        baseline = plan_kit(directory, 'development', model='offline-test-model')
+        self.assertNotIn('reasoning', baseline['manifest']['settings'])
+        explicit = plan_kit(directory, 'development', model='offline-test-model',
+                            reasoning_effort='high', max_output_tokens=8192)
+        self.assertEqual(explicit['manifest']['settings'], {
+            'model':'offline-test-model', 'max_output_tokens':8192, 'reasoning':{'effort':'high'}})
+        self.assertEqual(explicit['experiment_kit_sha256'], baseline['experiment_kit_sha256'])
+        for request in explicit['requests']:
+            self.assertEqual(request['payload']['reasoning'], {'effort':'high'})
+            self.assertEqual(request['request_sha256'], digest(request['payload']))
+        self.assertNotEqual({item['request_sha256'] for item in explicit['requests']},
+                            {item['request_sha256'] for item in baseline['requests']})
+        self.assertFalse(list(directory.rglob('*.jsonl')))
+        with self.assertRaisesRegex(ValueError, 'Unsupported reasoning effort'):
+            plan_kit(directory, 'development', model='offline-test-model', reasoning_effort='unknown')
+
     def test_invalid_limits_guides_and_unknown_splits_do_not_reserve_output(self):
         for options in ({'max_rows':0}, {'timeout_seconds':float('nan')}, {'preflight_timeout_seconds':-1},
                         {'max_snapshot_bytes':False}, {'guides':{'sql':'','sqlp':'valid'}},

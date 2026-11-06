@@ -11,10 +11,11 @@ parameters; **SQLite executes both conditions**.
 does using SQLP instead of SQL affect AI agents' query correctness and total token
 usage?
 
-The offline workflow is implemented. Real model experiments, human review of the
-study answers, and visual browser testing are still pending. Prepared queries,
-synthetic replay, and static token counts are development evidence; we have not
-established an agent accuracy or token-efficiency advantage.
+The workflow now has [real development-pilot results](docs/PILOT_RESULTS.md).
+SQLP generated shorter queries, but its guide overhead increased total tokens
+in these runs. Human answer review, the reserved-question study, and visual
+browser testing remain pending. We have not established an agent accuracy or
+total-token advantage.
 
 ## Quick start
 
@@ -93,7 +94,7 @@ UNION, and multiple FROM bindings are outside the current profile. See
 | [C++ frontend](docs/COMPILER_CLI.md) | Tokenizer, Bison parser, query AST, name/type checks, path compilation, parameterized SQL, and translation traces |
 | [Dataset tools](docs/DATASET_CHECKS.md) | Inspect SQLite schemas and validate actual types, keys, and total references |
 | [Restricted ARM layer](docs/ARM_MAPPING.md) | Validate reviewed single-key mappings and create logical SQLite views/catalog; inspired by the Abstract Relational Model (ARM) |
-| [Python runner](docs/MODEL_PILOT.md) | Score prepared pairs; plan or replay separate SQL/SQLP requests; journal responses and preserve raw usage/status. An explicit live adapter is implemented but unused |
+| [Python runner](docs/MODEL_PILOT.md) | Score prepared pairs; plan, replay, or make explicit live SQL/SQLP requests; load private credentials, preserve reasoning settings, journal responses and raw usage/status |
 | [Study tools](docs/EXPERIMENT_KIT.md) | Freeze inputs/runtime, export [review packets](docs/REVIEW_PACKET.md), analyze paired records, and measure prepared-query sizes/timings |
 | [Browser viewer](docs/VIEWER.md) | Display saved queries, answers, diagnostics, tokens, path mappings, and optional ARM mapping artifacts using plain HTML/CSS/JavaScript |
 
@@ -118,8 +119,9 @@ and schema. Missing usage stays unknown. A repair loop is not implemented.
 
 Shorter query text alone does not establish lower total model usage. The
 [offline microbenchmarks](docs/OFFLINE_BENCHMARKS.md) measure prepared-query text
-and execution separately from model performance. Real runs still require model
-access, an agreed spending limit, and reviewed study inputs.
+and execution separately from model performance. The [first live pilot](docs/PILOT_RESULTS.md)
+keeps development outcomes separate from the still-unrun reserved questions.
+See [credential setup](docs/CREDENTIALS.md) before configuring a live run.
 
 ## Build and checks
 
