@@ -16,6 +16,7 @@ import tempfile
 import time
 
 from .compiler_catalog import catalog_argument_file
+from .credentials import load_api_key
 from .model_provider import OpenAIResponsesClient, ProviderError, parse_response
 from .run_comparison import (DEFAULT_COMPILER, SQLITE_BYTES, SetupError,
                              _check_workload, _compile, _condition, _rows)
@@ -24,6 +25,7 @@ from .validate_dataset import (PreflightTimeoutError, _unique_object,
 
 ROOT = Path(__file__).resolve().parents[1]
 LANGUAGES = ("sql", "sqlp")
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
 def digest(value):
@@ -62,7 +64,7 @@ def _settings(settings):
     if "reasoning" in settings:
         value = settings["reasoning"]
         if (not isinstance(value, dict) or set(value) != {"effort"} or
-                value["effort"] not in ("none", "minimal", "low", "medium", "high", "xhigh")):
+                value["effort"] not in REASONING_EFFORTS):
             raise ValueError("reasoning must specify an explicit supported effort")
     # A fresh JSON object prevents a provider mutating settings shared by arms.
     return json.loads(json.dumps(settings, allow_nan=False))
@@ -349,12 +351,16 @@ def main():
     parser.add_argument("workload", type=Path)
     parser.add_argument("--model", required=True)
     parser.add_argument("--max-output-tokens", type=int, default=1024)
+    parser.add_argument("--reasoning-effort", choices=REASONING_EFFORTS,
+                        help="Explicit provider reasoning effort; omitted leaves the provider default unchanged")
     parser.add_argument("--compiler", type=Path, default=DEFAULT_COMPILER)
     parser.add_argument("--sql-guide", type=Path, default=ROOT / "prompts/sql.md")
     parser.add_argument("--sqlp-guide", type=Path, default=ROOT / "prompts/sqlp.md")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--replay", type=Path)
     mode.add_argument("--live", action="store_true", help="Make paid API calls; requires explicit request cap and journal")
+    parser.add_argument("--api-key-file", type=Path,
+                        help="Read a private raw key or OPENAI_API_KEY/AI_API_KEY assignment; live mode only")
     parser.add_argument("--journal", type=Path)
     parser.add_argument("--max-requests", type=int, default=0)
     parser.add_argument("--seed", type=int, default=0)
@@ -365,6 +371,12 @@ def main():
     args = parser.parse_args()
     origin = "replay" if args.replay else "live" if args.live else "dry_run"
     try:
+        if args.api_key_file is not None and not args.live:
+            raise ValueError("--api-key-file requires --live")
+        settings = {"model": args.model, "max_output_tokens": args.max_output_tokens}
+        if args.reasoning_effort is not None:
+            settings["reasoning"] = {"effort": args.reasoning_effort}
+        settings = _settings(settings)
         provider = None
         if args.replay:
             replay = json.loads(args.replay.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
@@ -373,12 +385,13 @@ def main():
             provider = ReplayProvider(replay.get("entries"))
         elif args.live:
             # Read a secret only after the operator explicitly selects live mode.
-            provider = OpenAIResponsesClient(os.environ.get("OPENAI_API_KEY"), args.provider_timeout)
+            key = load_api_key(args.api_key_file) if args.api_key_file is not None else os.environ.get("OPENAI_API_KEY")
+            provider = OpenAIResponsesClient(key, args.provider_timeout)
         report = run_pilot(args.database, load_catalog(args.catalog),
                            json.loads(args.workload.read_text(encoding="utf-8"), object_pairs_hook=_unique_object),
                            args.compiler, guides={"sql": args.sql_guide.read_text(encoding="utf-8"),
                                                   "sqlp": args.sqlp_guide.read_text(encoding="utf-8")},
-                           settings={"model": args.model, "max_output_tokens": args.max_output_tokens},
+                           settings=settings,
                            origin=origin, provider=provider, journal_path=args.journal,
                            max_requests=args.max_requests, seed=args.seed, max_rows=args.max_rows,
                            timeout_seconds=args.timeout, preflight_timeout_seconds=args.preflight_timeout)

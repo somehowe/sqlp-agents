@@ -2,13 +2,13 @@
 
 The [prepared comparison](QUERY_COMPARISON.md) tests execution with hand-written
 queries. `tools.run_pilot` adds separate SQL/SQLP requests, raw response and usage
-records, and request-bound replay. **No real model comparison has been collected.**
+records, and request-bound replay. The [November 6 development pilot](PILOT_RESULTS.md)
+contains the first live evidence; it is not a held-out study.
 The six academic questions are development fixtures, not held-out research data.
 The [Chinook workload](WORKLOAD.md) adds 12 development and 30 reserved questions,
 with human interpretation review still pending. The [experiment kit](EXPERIMENT_KIT.md)
 freezes their data, compiler, guides, runtime, and private scoring material and
-plans requests without API access. Wait for the user's model access before any
-live run.
+plans requests without API access. Live runs require authorized access and spending.
 
 ## Plan without calling a model
 
@@ -90,7 +90,9 @@ question eligibility, human-checked answers, guides, model/settings, and limits
 before the first held-out call.
 
 Token totals use provider-reported `input_tokens + output_tokens`, including
-instructions and reasoning tokens counted by that provider. Cached/reasoning
+instructions and reasoning tokens counted by that provider. `--max-output-tokens`
+covers visible output and reasoning tokens, so a small cap can truncate a query.
+Cached/reasoning
 details remain in the raw response and are not added twice. Missing/partial usage
 is `null`; a language summary is unknown if any of its attempts lacks usage.
 Failed attempts with reported usage still count. Replay usage describes the
@@ -119,10 +121,14 @@ answers, then freeze guides/settings/limits. Run the prepared comparison on the
 chosen compiler/catalog first, so executable or argv-size incompatibilities are
 found before spending on generation. The optional HTTP adapter uses only
 Python's standard library and the official Responses endpoint. `--live` is an
-explicit opt-in and also requires `--max-requests`, a fresh `--journal`, and an
-already configured `OPENAI_API_KEY`. It sends at most the planned requests, has
+explicit opt-in and also requires `--max-requests`, a fresh `--journal`, and a key.
+Use `--api-key-file PATH` ([file format](CREDENTIALS.md)) or the process environment's
+`OPENAI_API_KEY` when that option is omitted. The file option is valid only with
+`--live`; dry runs and replay never read credentials. It sends at most the planned requests, has
 no redirects/retries, and limits each response to 8 MiB. Request/output-token caps
-are not a dollar budget. No live calls were made during this implementation.
+are not a dollar budget. Use the same `--reasoning-effort high` (or another supported
+effort) in both conditions and the dry-run plan. Omitting the option preserves
+the provider default; a model may reject an effort supported by another model.
 
 Run `make test` for offline protocol, replay, leakage, and execution regressions.
 Exit codes: `0` means dry-run planning succeeded or every executed answer matched;
