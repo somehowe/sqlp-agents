@@ -1,9 +1,16 @@
 # Optional NatSQL comparison
 
-The **complete official NatSQL converter now runs** in an isolated compatibility
-environment. This replaces the earlier import-blocked status. It is an optional
-baseline, separate from the SQL/SQLP pilot runner. No model calls, token savings,
-or agent accuracy improvements have been established by these checks.
+The pinned official NatSQL converter runs in an isolated compatibility
+environment. A separate first-attempt model condition is now implemented in
+[tools/natsql_pilot.py](../tools/natsql_pilot.py), using the corresponding
+[NatSQL guide](../prompts/natsql.md). It receives the same public catalog facts
+as SQL and SQLP, then converts and scores every generated query.
+
+The [recorded study](STUDY_RESULTS.md) contains three repetitions of the same
+12 Chinook questions for each of Sol, Luna, and Astra. Each model matched 33/36
+expected answers. The six-table Queen question was rejected by the converter
+in all nine attempts; those failures remain in the denominator. These results
+describe this declared adapter/profile, not the full published NatSQL system.
 
 ## What runs
 
@@ -34,7 +41,7 @@ references, and 256 columns. It requires at most one declared unique key per
 table; keyless relationship tables retain duplicates. These bounds describe the
 adapter, **not NatSQL's general expressiveness**.
 
-## Compatibility results
+## Earlier handwritten compatibility checks
 
 Full conversion and shared row-bag scoring were checked on every one of the
 12 Chinook development questions. **11 matched their expected answers; one did
@@ -125,17 +132,24 @@ There are 11 adapter tests and 8 opt-in full-converter tests. The adapter tests
 use local process fixtures only to check protocol handling and snapshot isolation;
 they are not counted as NatSQL compatibility results.
 
-## How it fits the study
+## Model-run contract
 
-Keep SQL versus SQLP as the required comparison. NatSQL can add an informative
-third representation only with a frozen guide, equivalent catalog facts, and a
-declared eligible workload before any model calls. The current two-condition
-runner does not yet implement that third condition.
+`plan_natsql` constructs public requests without reading a database or calling
+a model. `run_natsql_pilot` accepts an explicitly supplied provider, fresh
+journal, request cap, settings, guide, and converter configuration. A converter
+smoke test and dataset preflight precede paid calls. Raw responses and provider
+usage are journaled before conversion/scoring; no syntax repair is performed.
+Generation, conversion, execution, and wrong-answer failures remain distinct.
 
-Do not retrospectively remove the failed six-table development case from the
-compatibility report or call the remaining 11 a universal NatSQL success rate.
-A narrower common profile can be designed for a **future** three-way experiment,
-with its limits, coverage, and out-of-profile cases reported explicitly. Once
-that eligible set is fixed, retain all model/conversion failures on it. The
-role-heavy SQLP examples can remain separate demonstrations; they cannot by
-themselves establish an agent advantage over NatSQL.
+Reports use `kind: "natsql_first_attempt"` and the language `natsql`; they are
+not renamed SQL/SQLP records. Their per-language summary retains full usage.
+The two-condition saved viewer/analyzer expects SQL and SQLP, so inspect this
+standalone report or the study aggregation rather than relabeling its records.
+The interactive lab's manually editable languages remain SQL and SQLP.
+
+The study retained all 12 eligible development questions, including the failed
+six-table case. The 32 synthetic role/depth templates and wider catalogs are
+separate controls, outside this NatSQL comparison. The schema adapter omits
+upstream linguistic preprocessing and value recovery; no result proves that
+another NatSQL encoding, configuration, or full pipeline could not succeed.
+No API credential is needed for the public demo or offline protocol tests.

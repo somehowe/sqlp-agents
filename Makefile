@@ -76,12 +76,20 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/schema_inspection_test.py
 	python3 tests/arm_mapping_test.py
 	python3 tests/chinook_test.py
+	python3 tests/path_study_test.py
+	python3 tests/join_views_test.py
 	python3 tests/comparison_test.py
 	python3 tests/model_provider_test.py
 	python3 tests/credentials_test.py
+	python3 tests/research_budget_test.py
 	python3 tests/pilot_test.py
+	python3 tests/batch_pilot_test.py
+	python3 tests/natsql_pilot_test.py
 	python3 tests/analysis_test.py
+	python3 tests/snapshot_evaluation_test.py
 	python3 tests/demo_test.py
+	python3 tests/demo_server_test.py
+	python3 tests/demo_bundle_test.py
 	python3 tests/offline_example_test.py
 	python3 tests/experiment_kit_test.py
 	python3 tests/review_packet_test.py
@@ -91,6 +99,7 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 
 test-viewer:
 	node tests/viewer_test.js
+	node tests/lab_test.js
 
 build/compiler_fuzz_sanitize: tests/compiler_fuzz.cc src/parser.cc src/parser.h \
 				build/sqlp_parser.cc build/sqlp_parser.h src/lexer.cc src/lexer.h \

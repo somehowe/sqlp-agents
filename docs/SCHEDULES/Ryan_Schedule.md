@@ -1,31 +1,31 @@
 # Ryan's schedule
 
-Updated November 6, 2026. Budget 12–15 hours a week. The core compiler, runner,
-viewer, restricted ARM mappings, and offline workload now work. I should spend
-my next block understanding and reviewing them rather than rebuilding them.
-The Nov 4 review packets and Nov 6 real development pilots are ready. A completed
-second-person answer review is still pending. Read [the results](../PILOT_RESULTS.md).
+Updated November 6, 2026. Budget 12–15 hours a week. The implementation, recorded
+experiments, working four-page paper, and captioned video are ready for review.
+My next block should help me understand and explain them. The
+[study results](../STUDY_RESULTS.md) retain both wins and failures; human answer
+review remains pending.
 
 | Due, 2026 | What I should have done |
 |---|---|
-| **Wed Nov 4** | Trace one SQLP question through AST → joins → SQLite → checked record. Use the new review packet to inspect development questions and arrange a second human answer review; choose model/access/budget when ready. |
-| **Sat Nov 7** | Inspect completed pilot queries, failures, full usage, and duplicate-title counterexample. Freeze syntax/guides. Decide whether a matched NatSQL condition fits the time and scope. |
-| **Mon Nov 9** | Have the working four-page draft and ARM/demo walkthrough ready for the internal mentor target Ryan reported. Use actual pilot/offline evidence and confirm review availability. |
-| **Wed Nov 11** | Finish human answer review; freeze reserved workload, data/views/catalog, settings, and limits. Verify a fresh kit before reserved calls. |
-| **Sat Nov 14** | Complete paired runs and analysis. Inspect wrong answers and usage, then load real records in the viewer. |
-| **Wed Nov 18** | Finish four-page draft/figure with claims tied to saved evidence. Keep paper files local. |
-| **Sat Nov 21** | Reproduce setup, check the real browser, rehearse, record video, and incorporate review. |
-| **Sun Nov 22** | Confirm contributor approval/authorship and submit. Reserve Nov 23 for submission issues. |
+| **Sat Nov 7** | Trace SQLP text → AST → joins → SQLite → recorded answer. Explain why native queries and shared-context batches have different token results. Ask for human checks of question meanings and duplicate-sensitive answers. |
+| **Mon Nov 9** | Walk Enamul through the working four-page draft, real examples, and manual lab if available. Explain the NatSQL adapter limits and required-view follow-up. |
+| **Wed Nov 11** | Incorporate feedback and freeze claims, figures, scenarios, and reproduction steps. Review and freeze any optional reserved follow-up before model calls. |
+| **Sat Nov 14** | Rehearse the audience interactions and review error displays. Keep original experimental records unchanged if adding a new condition. |
+| **Wed Nov 18** | Reconcile every paper number and caption with saved evidence; check the four-page limit and citations. |
+| **Sat Nov 21** | Run a fresh-checkout demo, get a human browser review, check the video, and confirm contributor details. |
+| **Sun Nov 22** | Confirm approvals and submit through the designated account. Reserve Nov 23 for submission issues. |
 
-For the next three-hour block: spend roughly one hour tracing a compiler test,
-one reviewing several development questions and their Python answer plans, and
-one inspecting actual pilot records in the demo. I should be able to explain what
-the catalog supplies, what the compiler guarantees, and what the oracle checks.
+For a three-hour block: spend one hour tracing a compiler example, one reviewing
+question meanings and contrasting answers, and one running the interactive lab
+while explaining actual token accounting. I should be able to distinguish what
+the catalog supplies, what the compiler guarantees, and what an oracle match
+can establish on a specific snapshot.
 
-Access is supplied; check the private $30 ledger before further calls. Keep
-actual development evidence separate from the still-unrun reserved study.
-Full ARM identity reasoning, a native executor, discovery, and extra syntax stay
-outside this deadline. If access/review slips, revise scope before adding work.
+The study is complete as an exploratory case study; the 30 reserved questions
+remain unrun. Check the cumulative $100 ledger before further paid experiments.
+Full ARM identity reasoning, a native executor, automatic discovery, and more
+syntax stay outside this submission.
 
-[Shared checkpoints](SCHEDULE.md) · [Experiment kit](../EXPERIMENT_KIT.md)
-· [Question review](../REVIEW_PACKET.md)
+[Shared checkpoints](SCHEDULE.md) · [Study results](../STUDY_RESULTS.md)
+· [Interactive lab](../DEMO_LAB.md)

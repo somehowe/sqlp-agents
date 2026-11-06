@@ -1,30 +1,27 @@
-# Iris's schedule — optional evaluation handoff
+# Iris's schedule — optional research review
 
 Updated November 6, 2026. You have discussed a possible data-lake extension;
-its scope and ownership still need agreement. The tasks below are optional help
-with the current SQLP-agent study, not commitments for a separate paper.
-Required delivery here currently rests with Ryan. Earlier contributions and
-authorship remain a separate discussion.
+its scope and ownership still need agreement. These are optional contributions
+to the current SQLP-agent demo, rather than commitments for another project.
+Required implementation here rests with Ryan; authorship is a separate decision.
 
-The runner already makes separate requests, calls the compiler, executes SQLite,
-checks row bags, and records usage. The most valuable help is **human question
-and answer review**, followed by inspecting real model failures.
+The runner and experiments are implemented. The most valuable help is **human
+review of question meanings, answers, and research claims**.
 
-| Due, 2026 | Useful contribution |
+| Due, 2026 | Useful contribution if agreed |
 |---|---|
-| **Wed Nov 4** | Read IDEA.md; review several development questions against the data and expected answers. Trace one saved run with Ryan. |
-| **Sat Nov 7** | Review the Nov 6 pilot failures, duplicate-title counterexample, and raw usage. Check both languages receive equivalent relationship facts and corresponding guides. |
-| **Mon Nov 9** | Review the methods/related-work paragraph and ARM example for the internal working-draft walkthrough. |
-| **Wed Nov 11** | Cross-check an agreed subset of reserved questions/answers before the study freezes. Flag ambiguous wording, wrong roles, and duplicate-sensitive answers. |
-| **Sat Nov 14** | Inspect real wrong answers/failures and descriptive summaries; confirm failures stay in the denominator and missing usage stays unknown. |
-| **Wed Nov 18** | Review methods/results/limitations against the actual saved records. |
-| **Sat Nov 21** | Recheck paper numbers and reproduction instructions. |
+| **Sat Nov 7** | Read IDEA.md and STUDY_RESULTS.md. Check several questions and expected bags, especially duplicate handling and deeper relationship chains. |
+| **Mon Nov 9** | Review the paper's research question, related work, NatSQL scope, and demonstration explanation for the mentor walkthrough. |
+| **Wed Nov 11** | Flag ambiguous wording or unsupported claims before the submission freezes. Any reserved follow-up needs reviewed answers before its first calls. |
+| **Sat Nov 14** | Inspect recorded failures and check that batch usage is counted once per response, with no invented per-question reasoning. |
+| **Wed Nov 18** | Review results and limitations against the saved evidence. |
+| **Sat Nov 21** | Recheck final numbers, citations, and reproduction instructions. |
 | **Sun Nov 22** | Approve your contributions and final claims before submission. |
 
-Model inputs contain the question, schema/relationships, and language guide;
-prepared queries and expected rows stay private. Count all provider-reported
-input/output tokens without double-counting cache/reasoning details. Tokens do
-not directly measure thinking time. NatSQL remains optional; do not rebuild the
-runner or start another compiler for this deadline.
+Prepared queries and expected rows do not enter model prompts. Shared-context
+batches, NatSQL, and view controls are already implemented; no replacement
+runner is needed. The 30 reserved questions remain unrun and independent human
+interpretation review is still pending.
 
-[Shared schedule](SCHEDULE.md) · [Workload](../WORKLOAD.md) · [Review packet](../REVIEW_PACKET.md)
+[Shared schedule](SCHEDULE.md) · [Study results](../STUDY_RESULTS.md)
+· [Review packet](../REVIEW_PACKET.md)

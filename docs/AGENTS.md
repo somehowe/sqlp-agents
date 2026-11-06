@@ -4,11 +4,11 @@ Updated November 6, 2026. Read this for project context before working on the re
 
 ## Current direction and context
 
-Build one SQLP-to-SQL compiler written in C++, one reproducible agent comparison, and one interactive demo for the ICDE 2027 Demonstrations Track. A restricted ARM mapping/view layer is implemented and tested. Real development pilots have now run; human answer review and the reserved-question study remain open. Read [PILOT_RESULTS.md](PILOT_RESULTS.md) before proposing further experiments.
+Build one SQLP-to-SQL compiler written in C++, one reproducible agent comparison, and one interactive demo for the ICDE 2027 Demonstrations Track. A restricted ARM mapping/view layer is implemented and tested. The bounded exploratory study, interactive lab, working four-page paper, and captioned video are complete for review. Human interpretation review remains pending; the 30 reserved questions are unrun. Read [STUDY_RESULTS.md](STUDY_RESULTS.md) before proposing more experiments.
 
 **Research question:** Given equivalent schema and relationship information, how does using SQLP instead of SQL affect AI agents' query correctness and total token usage?
 
-The same model generates SQL and SQLP in separate conditions. The C++ compiler translates SQLP into SQL and parameters. SQLite executes both against the same data. The runner checks independently prepared answers and records prompts, attempts, results, diagnostics, and token usage. The website makes those records and path translations inspectable.
+The same model generates SQL and SQLP in separate conditions. The C++ compiler translates SQLP into SQL and parameters. SQLite executes both against the same data. The runner checks separately computed expected row bags and records prompts, attempts, results, diagnostics, and token usage. Constructed reference queries and record-walk checks share authored interpretations; independent human semantic review remains pending. The website makes the records and path translations inspectable.
 
 Ryan is learning C++ while working on this research project with mentor Enamul Haque, supervisor Grant Weddell, and teammates Iris Mo and Samridh Sood. Ryan's latest update says Sam is planning a separate paper, while Iris has discussed a possible data-lake extension. Required delivery here currently rests with Ryan; agree on any additional contributions rather than assuming availability. This does not decide authorship or erase earlier contributions. Enamul does not require a native executor. He has offered writing help; do not assume he has approved every detail or accepted an assigned deadline.
 
@@ -36,32 +36,30 @@ The Python runner orchestrates execution; the local viewer consumes its saved re
 
 ## Actual code at this update
 
-Verified November 6: `make -j2 all test` passes the C++ suites and discovers 278 Python tests, with eight optional NatSQL integrations skipped locally. A fresh checkout additionally skips the separately downloaded Chinook and tokenizer integrations (ten optional skips total). It also passes 1,200 differential queries against an independent path oracle. The earlier configured environment passed the optional integrations. The core checks need no model access or private resources. The six-case academic fixture and 42-question Chinook workload pass prepared-query checks. These are implementation checks, not AI results. Recheck the working tree before assigning unfinished work.
+The current checks cover the C++ suites, 354 Python tests, 1,200 differential
+queries, and 50 Node checks (23 saved-viewer plus 27 lab checks). Optional
+integrations skip when their separate inputs are unavailable; fresh checkouts
+can have more skips than Ryan's configured environment. A real Chromium
+walkthrough passed 14 browser checks. Recheck the current tree before claiming
+new changes passed. Tests are implementation checks, not model evidence.
 
-The viewer's 23 Node checks pass, including actual ARM artifacts. Two local frozen
-kits are available at `build/experiment-ready-2026-11-02/` and
-`build/experiment-arm-ready-2026-11-02/`; each verifies and plans 24 development
-requests plus 60 reserved requests without API use. Synthetic prepared-query
-replay through their copied runtimes, analysis, and viewer also passes, with
-unknown usage and explicit synthetic labels. These generated paths are ignored;
-use [EXPERIMENT_KIT.md](EXPERIMENT_KIT.md) to reproduce them. No rendered browser check has been performed. Real development runs are
-archived separately under ignored `resources/experiments/2026-11-06/`.
+The completed [study](STUDY_RESULTS.md) has 81 validated reports, 2,196 real model
+calls, and 2,556 scored query attempts: 12 Chinook development questions and 32
+related synthetic templates, three same-provider models, and three repetitions
+per condition. It includes native generation, JSON batches, NatSQL, wider
+catalogs, optional join views, and a post-hoc required-view follow-up. All
+failures remain included. Repeated templates/snapshots are not independent
+research tasks. Human semantic review remains pending; no reserved calls ran.
 
-The [complete offline example](OFFLINE_EXAMPLE.md) now reproduces the academic
-demo, freezes its runtime, plans twelve requests, replays explicitly synthetic
-reference responses, and analyzes them with unknown usage. The viewer checks
-all its generated prepared, deliberate-mistake, and replay cases. The workflow
-under `.github/workflows/offline-checks.yml` runs these checks for pull requests
-and pushes to `main`; no API credentials are supplied.
-
-The [review-packet exporter](REVIEW_PACKET.md) copies a kit's selected questions,
-database, catalog, reference queries, compiler paths, and complete typed answers
-into a private portable folder. Its Markdown preview counts duplicate rows;
-the editable CSV starts blank. Status checking binds annotations to the case
-hashes and can compare the full packet against its original kit. This records
-notes, not authenticated review or model evidence. Local Chinook packets under
-`build/question-review-2026-11-04/` cover 12 development and 30 reserved questions;
-their human-review status remains pending.
+The full local archive is `resources/experiments/demo-study-2026-11-06/`, with
+frozen inputs, raw journals, reports, validated summary, and cumulative spending
+ledger. The earlier six-run pilot remains separate. The [public offline example](OFFLINE_EXAMPLE.md)
+reproduces prepared/synthetic records without API access. The new
+[demo bundle and query lab](DEMO_LAB.md) provide a fresh-checkout, no-key audience
+walkthrough: edit a query, inspect joins, and switch valid snapshots. Its default
+bundle is prepared, while recorded model bundles remain separately labeled.
+The [review packets](REVIEW_PACKET.md) expose questions and row bags for human
+checks; exporting or annotating a packet does not certify that review occurred.
 
 | Files | Present behavior |
 |---|---|
@@ -78,12 +76,18 @@ their human-review status remains pending.
 | `tools/prepare_chinook.py`, `examples/chinook/` | Hash-pinned licensed sample-store data, 12 development and 30 reserved questions, prepared query pairs, and separate Python answer plans. The same 42 questions also pass through ARM views. Human interpretation review is pending. See [WORKLOAD.md](WORKLOAD.md). |
 | `tools/run_comparison.py` | Prepared SQL/SQLP execution, row-bag answer checking, typed records, and per-condition diagnostics/limits on one read-only snapshot. No model calls or usage estimates. See [QUERY_COMPARISON.md](QUERY_COMPARISON.md). |
 | `tools/run_pilot.py`, `tools/model_provider.py`, `prompts/` | Dry-run requests, request-bound replay, one first attempt per language, raw provider usage/status, durable response journals, and artifact hashes. Explicit live adapter has been used; private key-file loading and explicit reasoning effort are supported. See [MODEL_PILOT.md](MODEL_PILOT.md). |
+| `tools/batch_pilot.py` | Shared-context JSON batches with B1/B4/B12 controls; provider usage belongs to the whole response, never an invented per-query allocation. See [BATCH_PILOT.md](BATCH_PILOT.md). |
+| `tools/prepare_path_study.py`, `examples/path_study/` | 32 matched synthetic templates at depths 1/2/4/6, two catalog widths, and alternate valid snapshots. Reference queries and Python record-walk answers share authored path plans; separate execution checks do not supply independent semantic gold. Human interpretation review is pending. |
+| `tools/prepare_join_views.py` | Workload-independent, fixed-depth catalog views and a language-neutral mapping guide exposed to both conditions. See [JOIN_VIEWS.md](JOIN_VIEWS.md). |
+| `tools/evaluate_snapshots.py` | Re-score saved queries on supplied alternate databases with no new model usage. Diagnostic evidence, not equivalence proof. See [SNAPSHOT_EVALUATION.md](SNAPSHOT_EVALUATION.md). |
+| `tools/research_budget.py` | Durable shared spending reservations and raw response retention for explicitly authorized calls; estimates are not invoices. |
+| `tools/demo_bundle.py`, `tools/demo_server.py`, `web/lab.*` | Reproducible prepared bundle and loopback-only manual SQL/SQLP execution, path graph, and snapshot switching. No model calls or invented usage. See [DEMO_LAB.md](DEMO_LAB.md). |
 | `tools/compiler_catalog.py` | Private bounded catalog argument files shared by both runners; avoids OS argv limits while keeping the JSON catalog semantics unchanged. |
 | `tools/analyze_runs.py` | Descriptive paired correctness, failures, token totals/distributions and known-pair deltas; rejects incomplete or inconsistent batches. See [ANALYSIS.md](ANALYSIS.md). |
 | `tools/experiment_kit.py` | Freeze and verify data/compiler/source/guides/questions and private scoring material; produce exact dry-run requests from the copied runtime. No API calls. See [EXPERIMENT_KIT.md](EXPERIMENT_KIT.md). |
 | `tools/review_packet.py` | Export a portable question/answer packet for a person's review; validate immutable artifacts and editable case-bound CSV notes. See [REVIEW_PACKET.md](REVIEW_PACKET.md). |
 | `tools/benchmark_prepared.py` | Counterbalanced offline execution/compiler timings, prepared source sizes, and optional static token counts using a pinned local vocabulary. These are not model usage. See [OFFLINE_BENCHMARKS.md](OFFLINE_BENCHMARKS.md). |
-| `tools/natsql_adapter.py` | Optional isolated official NatSQL converter, with reviewed structural schema export and explicit compatibility limits. Not a third condition in the paired model runner. See [NATSQL.md](NATSQL.md). |
+| `tools/natsql_adapter.py`, `tools/natsql_pilot.py`, `prompts/natsql.md` | Pinned official converter plus an actual standalone model condition, with retained conversion failures and full raw usage. The structural adapter omits upstream linguistic preprocessing. See [NATSQL.md](NATSQL.md). |
 | `tools/create_demo.py`, `web/` | Creates fresh reference/deliberate-mistake records and displays saved reports locally with exact answers, usage, and interactive path mappings. No model/backend calls in the viewer. See [VIEWER.md](VIEWER.md). |
 | `tools/offline_example.py` | One command creates demo records, freezes a kit, plans requests, executes synthetic replay through its copied runtime, and analyzes the resulting records. See [OFFLINE_EXAMPLE.md](OFFLINE_EXAMPLE.md). |
 | `examples/academic/` | Fictional development fixture, catalog, and six manually prepared paired-query cases. Covers multi-hop roles, duplicate rows, and a finite mentor cycle. Not a held-out benchmark or model result. |
@@ -96,7 +100,7 @@ The separate Python preflight has a 30-second CLI/default runner timeout and rej
 
 `CompiledQuery.trace` owns join metadata and every path occurrence (SELECT order, then WHERE order). `PathTrace` stores clause/index, decoded `Path` components, ordered join IDs, and the final table/column. Join IDs are array positions local to one compilation; direct columns use no joins. Keep components structured because a quoted role may contain dots. Traces describe translation; source-text spans and row provenance remain future work.
 
-Text parsing, multi-hop compilation, and AND filters work through C++ functions and the CLI. The Python runners execute prepared pairs and replayed model-shaped responses. Provider usage/status handling and live HTTP calls have now been exercised with real paired development results; a repair loop remains unimplemented. A local saved-record viewer is implemented; visual browser testing remains to be done. Boolean syntax beyond AND-connected literal equalities remains unsupported. The old empty-vector test failure-return issue is fixed; do not reassign it from historical notes.
+Text parsing, multi-hop compilation, and AND filters work through C++ functions and the CLI. The Python runners execute prepared pairs and replayed model-shaped responses. Provider usage/status handling and live HTTP calls have now been exercised with real paired development results; a repair loop remains unimplemented. The saved viewer and interactive manual lab are implemented and have browser/DOM checks; a final human conference rehearsal remains. Boolean syntax beyond AND-connected literal equalities remains unsupported. The old empty-vector test failure-return issue is fixed; do not reassign it from historical notes.
 
 Accepted text shape: `SELECT [DISTINCT] path [AS alias], ... FROM table [AS] alias [WHERE path = literal [AND path = literal ...]];`. The FROM alias and final semicolon are required; projection aliases require AS. A literal is a string or signed int64. Paths may follow finite chains, including repeated visits to a table. Every component before the terminal column must resolve to a declared reference. Extra statements, trailing non-comment input, OR, NOT, and parentheses are rejected.
 
@@ -112,13 +116,13 @@ make test-viewer  # optional: Node.js 18+, no packages
 
 Requirements are GNU Make 4.3+, a C++20-capable `g++`, and Bison 3.8+. `make` builds the path demo and `build/sqlpc`; `make run` still prints `w.author.name`. The prepared runner and full `make test` require Python 3.11+ with its standard-library SQLite module. See [COMPILER_CHECKS.md](COMPILER_CHECKS.md) for reproducible differential/mutation checks and sanitizer limits. Run relevant build/tests when changing implementation, and report what actually ran.
 
-## Next compiler increment
+## Next review increment
 
 The object compiler, tokenizer, and Bison parser are implemented. Trace `tests/parser_test.cc` from SQLP text through `parse_query` and `compile_sqlp`. `Query.distinct` defaults to false; `std::optional` represents absent projection aliases; `SqlValue` preserves string/int64 types. `Query.where` is now a vector of `EqualityPredicate`, replacing the old optional single predicate; an empty vector omits WHERE. The prototype caps compilation at 63 distinct reference joins, 2,000 projections, and 512 equalities to stay within the tested SQLite profile. Conditions and parameters retain source order, and every term is validated. Tokens own their text and carry start/exclusive-end locations: zero-based byte offsets and one-based byte columns, with CRLF as one line break. Lexical failures propagate as `LexerError`; grammar failures use `ParseError`. Name/type errors still come from `compile_query` without source locations.
 
 1. Ryan should trace one parser test and one saved SQLP run end to end, then explain the AST, role-specific joins, parameters, and scoring. The compiler is already multi-hop; do not repeat completed grammar work.
-2. Review the Chinook questions/answer plans and frozen kit, then review the live pilot and remaining spending allowance. Use [the review packet](REVIEW_PACKET.md) for readable questions, paths, and answer bags; the separate Python oracle plans still need their own inspection. The user supplied access and authorized up to $30 on November 6; consult the private experiment ledger before any further spending. Read keys privately with tools.credentials; never print or commit them. Inspect a dry-run plan first; never send prepared queries/gold rows. Use [MODEL_PILOT.md](MODEL_PILOT.md). The development fixture and offline replay are not a study.
-3. Inspect the completed development pilots, including literal-value mistakes and the duplicate-title counterexample, then freeze the query language/guides. The restricted ARM layer is already implemented; review its assumptions rather than rebuilding it. Use the viewer/analyzer for inspection; extra grammar/native execution is lower priority. Large catalogs use bounded argument files; prompts and data still need explicit size limits.
+2. Review the completed [study](STUDY_RESULTS.md), question meanings, oracle plans, and demonstration. Use [review packets](REVIEW_PACKET.md) for readable row bags. The user authorized a cumulative $100 research ceiling; consult the shared private ledger before further paid work, rather than renewing a budget per process. Read keys privately with tools.credentials; never print or commit them. Inspect plans and never send prepared queries/gold rows to a query-generation model.
+3. Rehearse the interactive lab, including path/alias mistakes and duplicate-sensitive contrasts. Freeze the submission after mentor/human feedback. The restricted ARM layer, NatSQL condition, batches, and view controls are implemented; do not rebuild them or add grammar/native execution before review. No reserved calls are needed to describe the completed bounded exploratory demo honestly.
 
 Lexer conventions: bare identifiers use ASCII letters/underscore followed by letters/digits/underscore; double quotes allow other identifier characters. Strings use single quotes; repeated delimiters escape a quote and backslashes are literal. Decimal int64 values may have an adjacent minus sign. Plus signs, fractional/exponent/hex forms, empty quoted identifiers, embedded NULs, and unterminated quotes/comments are rejected. Line comments (`--`) and non-nested block comments (`/* ... */`) are skipped. Lexical acceptance does not imply that syntax or semantics are supported.
 
@@ -158,7 +162,7 @@ complete implementation of the thesis.
 
 ## Deadline language profile and semantics
 
-Required profile: projections, one FROM binding/alias, finite multi-hop named references, literal equality, AND, DISTINCT, parameters, and basic name/type checks. Freeze the evaluated profile by November 7. Correlated EXISTS, UNION, multiple FROM bindings, broader Boolean syntax, and additional SQL features remain later learning goals. Aggregates, ordering, optional/null navigation, general ARM identity reasoning, native execution, B+ trees, and automatic discovery are outside the required release.
+Required profile: projections, one FROM binding/alias, finite multi-hop named references, literal equality, AND, DISTINCT, parameters, and basic name/type checks. Preserve the evaluated profile when reproducing recorded runs; later syntax changes need their own condition. Correlated EXISTS, UNION, multiple FROM bindings, broader Boolean syntax, and additional SQL features remain later learning goals. Aggregates, ordering, optional/null navigation, general ARM identity reasoning, native execution, B+ trees, and automatic discovery are outside the required release.
 
 Important implementation contracts:
 
@@ -176,7 +180,7 @@ Agree on examples before independently building formats:
 - **Catalog:** versioned table/column types and named references with physical source/target columns and validated assumptions. Both conditions receive equivalent facts.
 - **Compiler:** SQLP text plus catalog in; SQL, ordered typed parameters, minimal path-to-join mappings, or structured diagnostics out. It does not execute SQL.
 - **Runner:** question/condition in; saved model/version/settings, guides, data/catalog versions, source query, compiled SQL, parameters, rows, errors, token usage, and timing out.
-- **Website:** the implemented local viewer consumes saved records, including queries, answers, usage, raw requests/responses, and path mappings. A live generation interface is optional and unimplemented.
+- **Website:** the saved viewer consumes records; the interactive lab compiles and executes manual SQL/SQLP edits and switches snapshots. These interventions make no model calls. Natural-language model generation from the browser remains unimplemented.
 
 Keep int64 values exact across JSON, using the existing lossless representation. Python's SQLite adapter supplies execution. A direct C++ SQLite wrapper is outside the required compiler scope.
 
@@ -184,7 +188,7 @@ The implemented CLI encodes both string and int64 parameter values as JSON strin
 
 Both runners use private catalog argument files. The pilot smoke-compiles a direct-column query before provider calls, freezes a private compiler binary copy, holds one read transaction, hashes the serialized snapshot including WAL pages, excludes gold from requests, and journals responses before scoring. Refusals/incomplete/empty outputs are failed attempts; provider/protocol failures and returned-model drift abort the pilot. Usage missing from any attempt makes the condition total unknown, not zero. Replay is labeled separately from live calls.
 
-The implemented viewer lets a visitor choose a question, inspect both attempts/answers/tokens, and click a path to see its mapping. Arbitrary questions remain **not independently benchmark-scored** until an expected answer is established. Label development fixtures, recorded real runs, and live runs accurately.
+The saved viewer lets a visitor inspect both attempts/answers/tokens and path mappings. The interactive lab additionally executes manual edits and switches snapshots without model calls. Arbitrary questions remain **not independently benchmark-scored** until an expected answer is established. Label development fixtures, recorded real runs, and live runs accurately.
 
 ## Evaluation and research claims
 
@@ -192,17 +196,41 @@ The required experiment compares SQL with SQLP using the same approved schema/re
 
 First-attempt generation is primary. Repairs are optional, with the same allowance for both conditions, for example two revisions. Never give the agent expected answers or gold correctness labels. Compiler/database diagnostics and query results are distinct from the scoring oracle.
 
-Start with one capable accessible model, one reviewed dataset, 12 development questions, and a target of 30 held-out questions. Ryan prepares reference answers and seeks a separate collaborator/mentor review; reduce the workload before evaluation if that review cannot be completed. Include longer paths, competing roles, repeated references, empty answers, and duplicate-sensitive cases. Use contrasting rows so wrong relationships do not accidentally produce correct answers.
+The completed comparison uses three models from the same provider, 12 Chinook
+development questions, and 32 related synthetic templates at four path depths.
+The 30 reserved questions remain unrun. Expected row bags come from separate
+record-walk oracles and fixture interpretations; this is automated validation,
+not independent human semantic review. Retain that limitation in the paper.
 
-Use development outcomes to improve the guides/system. Freeze the evaluated features and language guides on November 7. Finish independent reference-answer checks and freeze held-out questions, task eligibility, data/catalog versions, workload size, and run settings on November 11, before any held-out model calls; run the main comparison November 12–14. Keep failures, including unsupported model outputs on eligible tasks. Choose any smaller workload for capacity before inspecting held-out performance. Repetitions of one task are not extra independent questions.
+The core experiment is exploratory. Native one-question and JSON B1/B4/B12
+conditions are distinct; B1 controls the JSON response format. View availability
+and required-root use are also distinct: the latter was added after observing
+low adoption and must remain labeled post hoc. Both conditions receive the same
+facts, and every attempted eligible task remains in its denominator. Any future
+reserved study needs reviewed meanings/answers and a protocol freeze before its
+first model calls; it is not a prerequisite for reporting this bounded demo.
 
 Measure answer correctness and total provider-reported input/output tokens across all attempts, including guides, schema, feedback, and retries. Preserve raw usage; cache/reasoning fields may overlap totals and must not be double-counted. Report tokens per task including failures; tokens per correct task is undefined when none succeed. Query bytes, latency, and API spending are separate secondary measures. Query-source savings do not establish database-storage savings or human productivity gains.
 
 Compare result values and multiplicity, not exact SQL strings. Execution success, agreement between backends, or an LLM judge alone is insufficient. Fix compiler defects and rerun affected comparisons rather than treating them as evidence about SQLP itself.
 
-Real paired development results are recorded in [PILOT_RESULTS.md](PILOT_RESULTS.md); they do not establish a SQLP accuracy or total-token advantage. Earlier scripted probes establish feasibility and illustrate failure cases. The human SQLP study motivates the agent question; NatSQL/DIN-SQL already use intermediate representations and DAIL-SQL studies token efficiency. The proposed interest is named relationship roles, path length, and full interaction tokens. Stronger compiler checks mean the tested contribution is **SQLP plus compiler/checker**; syntax-only claims require further controls. Report positive, mixed, or negative findings without promising acceptance.
+The full paired results are recorded in [STUDY_RESULTS.md](STUDY_RESULTS.md): SQLP used more total tokens for native independent requests and fewer in shared-context batches on these tasks. This does not establish general efficiency or accuracy superiority. Earlier scripted probes establish feasibility and illustrate failure cases. The human SQLP study motivates the agent question; NatSQL/DIN-SQL already use intermediate representations and DAIL-SQL studies token efficiency. The proposed interest is named relationship roles, path length, and full interaction tokens. Stronger compiler checks mean the tested contribution is **SQLP plus compiler/checker**; syntax-only claims require further controls. Report positive, mixed, or negative findings without promising acceptance.
 
-NatSQL remains optional. The pinned [official converter](https://github.com/ygan/NatSQL/tree/dcd716fc9b920419cf838e490aad4a6f3b4fd231) now runs in an isolated modern environment, using a reviewed structural-schema export rather than its entire Spider preprocessing pipeline. Nineteen tests pass with that environment. Eleven of twelve handwritten Chinook development encodings match the oracle; the sixth-table case infers an undeclared ID join and returns a wrong answer. Repeated-table role probes also fail for the tested encodings. These are converter compatibility observations, not model results or proofs of impossibility. Do not discard the failing case to manufacture a favorable subset. See [NATSQL.md](NATSQL.md). A matched NatSQL guide and third model condition are not implemented. Add them only if a declared eligible profile, truthful failure handling, and time permit by Nov 7. DIN-SQL and DAIL-SQL inform workflow/prompt/evaluation design; they are not automatically additional conditions. Advertised credits do not establish activated model access or authorize spending.
+NatSQL has an actual standalone condition, not a relabeled SQL/SQLP run. Its
+pinned official converter uses a reviewed structural adapter rather than the
+full published preprocessing pipeline. Each model matched 33/36 answers; all
+nine six-table attempts were rejected during conversion and remain failures.
+Earlier handwritten checks are separate compatibility evidence. Do not exclude
+the failing case, claim an expressiveness impossibility, or treat this as a
+complete NatSQL reproduction. See [NATSQL.md](NATSQL.md).
+
+The join-view control expands all catalog prefixes through a fixed depth,
+without reading questions or gold. Optional views were used in only 25/108 SQL
+and 2/108 SQLP attempts. The required-view follow-up reached 108/108 use and
+answer matches per language. These controls do not show that optimized view
+selection is inferior. Alternate-snapshot checks can expose accidental matches;
+passing several snapshots still does not prove semantic equivalence.
+
 
 The offline Chinook microbenchmark found shorter SQLP prepared queries (35.9% fewer bytes, 42.8% fewer static query tokens), but guide + task + prepared-query text used 1.54% more static tokens overall. The fixed guide overhead can offset query savings. Static counts omit actual model reasoning, failed generations, retries, and provider framing; they cannot establish total API usage or agent accuracy. Timing measures include compiler startup/IPC and SQLite execution separately. Preserve the mixed result rather than promise a win.
 
@@ -210,15 +238,15 @@ The offline Chinook microbenchmark found shorter SQLP prepared queries (35.9% fe
 
 | Checkpoint, 2026 | Target |
 |---|---|
-| Nov 1 | Multi-hop compiler, checked development fixture, offline pilot/replay, local viewer, and descriptive analysis. Real model results remain open. |
-| Nov 4 | Review frozen offline inputs, question meanings, and ARM mappings; choose model/access/budget when available. |
-| Nov 7 | Review completed development pilots and semantic counterexample; freeze syntax/guides. Decide whether a matched NatSQL condition is feasible. |
-| Nov 9 | Working four-page draft and mapping/demo walkthrough for the internal mentor target Ryan reported; confirm availability. Not an official conference outline deadline. |
-| Nov 11 | Independent answer checks and held-out workload/settings freeze, including any accepted mappings/views and equal SQL access. |
-| Nov 14 | Nov 12–14 main comparison and initial analysis complete; viewer displays real comparison records. Live generation remains optional. |
-| Nov 18 | Revise the working draft around the main comparison's actual results and reviewed demonstration. |
-| Nov 21 | Reviewed paper, reproducible artifact, rehearsal, and video. |
+| Nov 6 — ready | Complete exploratory study, interactive manual lab, working four-page PDF, and short captioned video. |
+| Nov 7 | Trace and explain a real example; check question meanings, duplicate handling, and claims. |
+| Nov 9 | Mentor walkthrough of paper and demonstration if available; internal target, not an official outline deadline. |
+| Nov 11 | Freeze submission claims/scenarios after feedback; freeze any optional reserved follow-up before calls. |
+| Nov 14 | Incorporate human/mentor feedback and rehearse the actual interactions. |
+| Nov 18 | Reconcile figures and numbers with evidence; finalize four pages including references. |
+| Nov 21 | Fresh-checkout reproduction, human browser rehearsal, contributor and video checks. |
 | Nov 22 | Internal submission target; Nov 23 is the official demo deadline and contingency. |
+
 
 The ICDE demo paper uses IEEE format, four pages including references. It must explain motivation, architecture/core techniques, novelty/significance, scenarios, and audience interaction. Video is encouraged, at most five minutes/50 MB. Future submission should follow the then-current call, including AI-use disclosure. A polished website alone does not supply research evidence.
 
@@ -235,10 +263,9 @@ The separate UR2PhD Part 1 assignment requests a section titled “Research cont
 - Keep the current code-status/next-step sections here updated after meaningful implementation progress. Avoid another competing roadmap or status file.
 - `resources/` is Git-ignored and contains optional local references and historical notes. Shared docs should be understandable without that directory.
 - `resources/NEW.md`, `FINDINGS.md`, and `LEARNING.md` are historical. Their native-engine priorities, old role assignments, grammar promises, and earlier snapshots are superseded. Retain useful learning preferences and source detail, not stale instructions.
-- `resources/AUDIT_2026-11-01.md` contains optional local review notes and scratch experiment details; current behavior is documented in the component guides.
 - Local deeper material includes `resources/paper.tex`, `resources/PhD_Thesis_Oct_10_Enam (1).pdf`, and `resources/icde-audit/`. Verify exact thesis locations/pages before quoting; do not import page maps from a differently named copy without checking.
 - Course source is `resources/ASSIGMENTS.tex` plus `ASSIGMENTS.bib` (spelling intentional). It uses the IEEEtran class and BibTeX style; upload both to Overleaf. Local build: `pdflatex`, `bibtex`, `pdflatex`, `pdflatex` from `resources/`.
-- The separate conference draft is local-only under `resources/icde2027/`; do not commit or publish it. Its current four pages report offline observations only and explicitly leave actual model outcomes open.
+- The separate conference draft is local-only under `resources/icde2027/`; do not commit or publish it. Its four pages include the completed bounded exploratory study. The captioned video is also local. Do not publish draft content or private review correspondence through source documentation.
 - `resources/BACKUP_README.md` preserves the old README notes. Private mentor documents and generated companion code should not be published or adopted wholesale. The separate AI-built repository is a reference source, not evidence of ownership or a working feature in this repository.
 
 Consult sources in `resources/` when needed for a specific semantic question; do not make Ryan reread the entire thesis before the next small compiler increment.

@@ -1,115 +1,75 @@
 # SQLP for AI Agents: Correctness and Token Efficiency
 
-The idea is to see how using SQLP affects an AI agent's query correctness and token usage. The runner gives the same model a question separately in SQL and SQLP conditions, executes both against the same data, and compares answers and total tokens. The current website opens saved comparison records; live question entry is a possible later extension.
+We are studying whether SQLP makes it easier for models to write database
+queries correctly and with fewer total tokens. SQLP lets a query name the
+relationships it follows. Our C++ compiler turns those paths into SQL, and
+**SQLite executes both SQL and SQLP conditions**.
 
-**Research question:** Given equivalent schema and relationship information, how does using SQLP instead of SQL affect AI agents' query correctness and total token usage?
+**Research question:** Given equivalent schema and relationship information,
+how does using SQLP instead of SQL affect query correctness and total token usage?
 
-I think this gives us a concrete question while keeping the compiler work useful. SQLP could make joins easier to express, but models already know SQL and would need instructions for SQLP. Our [first development runs](PILOT_RESULTS.md) found shorter generated queries without lower total token usage. We still need reviewed answers and a reserved-question comparison before making a broader claim.
-
-## How the joins work
-
-Suppose we want the authors of recorded papers who work at universities in Denmark. With approved relationships between authorship records, authors, and universities, the model could write:
+## A small example
 
 ```sql
 SELECT DISTINCT w.author.name
-FROM WROTE w
+FROM WROTE AS w
 WHERE w.author.university.country = 'DK';
 ```
 
-Our C++ compiler would translate that into SQL like this, supplying `DK` separately as a parameter:
+The compiler follows the approved author and university mappings, creates the
+joins, and binds `DK` as a parameter. In the SQL condition, the model writes
+those joins itself. Both conditions receive the same relationship facts.
+The model still chooses the path: an author's university country and a paper's
+publisher country can mean different things.
 
-```sql
-SELECT DISTINCT a.name
-FROM WROTE AS w
-JOIN AUTHOR AS a ON w.author_aid = a.aid
-JOIN UNIVERSITY AS u ON a.uni_id = u.uid
-WHERE u.country = ?;
-```
+## What we have now
 
-In the SQL condition, the model writes the joins itself using the same relationship facts. In the SQLP condition, it chooses the path and our compiler constructs the joins. **SQLite executes both.** The compiler now supports this multi-hop behavior.
+The compiler, Python experiment runners, interactive lab, and saved-record
+viewer work. The compiler handles a tested subset: one root table, finite
+multi-hop paths, projections, literal equality, AND, and DISTINCT. A restricted
+ARM mapping layer can expose logical views over approved physical tables.
+We are not building a new storage engine or automatically discovering links.
 
-The model still has to choose the right relationship. Following a paper's publisher country instead of its author's university country could produce a valid query with the wrong answer. I think choosing the right relationship role, especially as paths get longer, is an interesting part to test.
+The [study](STUDY_RESULTS.md) contains 2,196 model calls across three models,
+using 12 Chinook questions and 32 related synthetic path templates. These are
+exploratory observations, not thousands of independent research tasks.
 
-## How the pieces fit
+The interesting finding is that the workflow matters. Asking questions one
+at a time made SQLP's longer guide outweigh its shorter queries. Sharing the
+same guide and schema across twelve questions reduced total usage by
+3.12–10.71% relative to SQL in these runs. We also tested a JSON one-question
+control, NatSQL, wider schemas, and shared generated join views. The results
+include the cases where SQLP did not help.
 
-The C++ compiler translates SQLP. The Python runner calls the model, compiles
-SQLP, executes both conditions in SQLite, and checks answers. The [local viewer](VIEWER.md) displays those saved records and path-to-join mappings.
+## What someone can do in the demo
 
-Ryan currently handles the required compiler, runner, and viewer work. Sam is
-planning a separate paper, and Iris has discussed a possible data-lake extension.
-Neither direction is implemented here. Help reviewing answers or the demo can
-still fit alongside those projects; specific tasks need agreement. This is
-separate from deciding authorship.
+Open the [query lab](DEMO_LAB.md), choose a scenario, and edit a SQLP path.
+Choose **Run** to compile and execute the edited query, inspect its joins, and
+compare its answer with the supplied expected rows. Typing alone does not run
+the edit. Switching snapshots executes the current query on the selected data,
+so visitors can see whether its answer still matches. SQL can be edited
+through the same scorer. These edits are manual and make no model calls.
 
-```mermaid
-flowchart TD
-    A["Question + equivalent schema/relationships"] --> B["Runner: independent model calls"]
-    B --> C["SQL"]
-    B --> D["SQLP"]
-    D --> E["C++ compiler: SQL + parameters + trace"]
-    C --> F["SQLite: same data snapshot"]
-    E --> F
-    F --> G["Runner: expected answers + actual token records"]
-    G --> H["Viewer: queries, answers, errors, paths, tokens"]
-```
+The public starter bundle contains prepared examples with no invented usage.
+Recorded model results can be loaded separately. A query can match one dataset
+and still miss its intended meaning, for example by merging different albums
+that share a title. Snapshot checks help expose this; they do not prove general
+query equivalence.
 
-## What the demo would show
+## What we still need to do
 
-Someone opens a saved run in the [local viewer](VIEWER.md) and chooses a question.
-They see both queries, SQLP's translation, answers, errors, and tokens. Selecting
-a path shows the exact tables and join columns it follows. This helps explain
-where the two attempts used different relationships. Live question entry can
-come later; the current viewer reads recorded runs.
+We have a working four-page demo-paper draft and a short captioned video locally.
+The next priority is mentor feedback, checking question meanings and expected
+answers, and rehearsing the actual audience walkthrough. Human interpretation
+review is still pending. The 30 reserved questions have received no model calls.
+A bounded exploratory demo can report the current evidence honestly; adding a
+reserved study requires review and a freeze before its first calls.
 
-The Chinook prepared queries are checked against separate Python answer plans;
-the academic fixture uses manually prepared expected answers. We still need a
-person to review that the study questions and answers mean what we intend. The
-[review packets](REVIEW_PACKET.md) make those questions, paths, and answer bags
-readable and provide a blank notes sheet. Arbitrary questions remain unscored
-until we know the correct answer. Agreement between SQL and SQLP alone doesn't
-prove correctness; both can be wrong.
+Ryan currently handles the required implementation and delivery. Sam is planning
+a separate paper, and Iris has discussed a data-lake extension. Help with review
+or the demonstration can fit alongside those directions, with tasks agreed
+rather than assumed. These old coding roles do not decide authorship.
 
-## How we test it
-
-Use the same model/settings, questions, data, and approved relationships. Give each condition a corresponding language guide. Count **all provider-reported input/output tokens**, including instructions, schema, and any retries. Start with one attempt per condition. A shorter query can still use more total tokens because of guide overhead or other generated text. Token counts do not directly measure thinking time.
-
-SQLP's human study motivates the question. NatSQL already simplifies model-generated queries. Its converter now runs in a separate environment, but our manual checks found failures on some longer paths and repeated relationship roles. Those are implementation observations, not an agent comparison. A third model condition still needs a matched guide and agreed scope, so it remains optional. The goal is an honest comparison, whichever language performs better.
-
-## The ARM mapping layer
-
-The small ARM layer connects this more directly to Enamul's work. It now takes
-reviewed entity/role names and declared keys/relationships, validates them, and
-builds a logical schema plus SQLite views over existing tables. Our compiler
-queries those views using the current SQLP syntax. The demo can show how a named
-relationship reaches stored data.
-
-This is implemented for single-column non-null keys, total references, and
-literal answers. It preserves duplicate relationship records with explicit
-keys. It does not discover which real-world records are the same entity or
-implement the full thesis. SQL gets equivalent views and facts if we use this
-layer in the study. See [ARM_MAPPING.md](ARM_MAPPING.md) for the exact subset.
-
-## Scope for this submission
-
-The compiler, prepared comparison, pilot/replay runner, viewer, analyzer, and
-restricted ARM layer work offline. An [experiment kit](EXPERIMENT_KIT.md) freezes
-their inputs and runtime, checks prepared answers, and produces exact requests
-without contacting a model. The live adapter has now been used for real paired
-development runs, with private credentials and matched model/reasoning settings.
-Prepared/replay runs remain separate from those actual model results.
-
-The current [workload](WORKLOAD.md) uses a pinned Chinook sample-store database:
-nine tables, 6,874 rows, 12 development questions, and 30 reserved questions.
-All 42 prepared SQL/SQLP pairs pass both directly and through generated ARM views.
-These are the same questions in two setups. Human answer review is still pending.
-Chinook is not a data lake. **We supply approved relationships to both conditions**;
-automatic discovery remains a later extension.
-
-One offline observation is already useful: on the 12 Chinook development
-questions, a local tokenizer counted fewer tokens in the prepared SQLP queries,
-but the longer guide canceled that saving across guide, task, and query text.
-Those static counts are separate from actual model usage. The real pilot also
-found that guide overhead outweighed shorter output on these questions. We also
-found an answer that matched the original data but failed when two albums shared
-a title. The next priority is checking question meanings and answers, then
-freezing the main comparison. See [the results and limitations](PILOT_RESULTS.md).
+Data-lake discovery is a possible extension. The current study receives approved
+relationships and uses a sample-store database plus constructed records. We
+should describe that setting precisely instead of calling it a complete data lake.
