@@ -11,11 +11,12 @@ parameters; **SQLite executes both conditions**.
 does using SQLP instead of SQL affect AI agents' query correctness and total token
 usage?
 
-The workflow now has [real development-pilot results](docs/PILOT_RESULTS.md).
-SQLP generated shorter queries, but its guide overhead increased total tokens
-in these runs. Human answer review, the reserved-question study, and visual
-browser testing remain pending. We have not established an agent accuracy or
-total-token advantage.
+The [exploratory study](docs/STUDY_RESULTS.md) now contains 2,196 model calls
+across three models. SQLP's total-token tradeoff changed with the workflow:
+independent questions cost more, while shared-context batches used fewer tokens
+on these tasks. The interactive lab lets visitors edit paths and inspect the
+resulting joins and answers. Human interpretation review remains pending;
+the 30 reserved questions have not received model calls.
 
 ## Quick start
 
@@ -30,15 +31,31 @@ From the repository root:
 
 ```bash
 make
+python3 -m tools.demo_bundle build/lab-demo
+python3 -m tools.demo_server --bundle build/lab-demo/bundle.json \
+  --compiler build/lab-demo/sqlpc --port 8765
+```
+
+Open `http://127.0.0.1:8765/`. Choose a scenario, edit a SQLP path, and click
+**Run** to compile and execute it. Inspect its joins, then switch snapshots to
+check the same query on contrasting data. SQL can use the same read-only scorer.
+Stop the server with Ctrl+C.
+
+This default bundle contains **prepared synthetic examples**, including a
+deliberate duplicate-handling mistake. It makes no model calls and invents no
+token usage. Recorded model runs are separate evidence. No API key, downloads,
+or Python packages are needed. Use a **new output folder** each time.
+See [the interactive lab](docs/DEMO_LAB.md).
+
+The original end-to-end offline example is also available:
+
+```bash
 python3 -m tools.offline_example build/offline-example
 ```
 
-This creates six prepared query pairs, deliberately incorrect examples, a frozen
-experiment kit, twelve planned requests, synthetic replay, and paired analysis.
-It requires no API key, downloads, or Python packages. Use a **new output folder**
-for each run; existing results are preserved.
+It creates prepared and deliberately incorrect examples, a frozen kit, planned
+requests, synthetic replay, and paired analysis. To open these saved records:
 
-To inspect the records, serve the static viewer:
 
 ```bash
 python3 -m http.server 8000 --bind 127.0.0.1 --directory web
@@ -95,32 +112,44 @@ UNION, and multiple FROM bindings are outside the current profile. See
 | [Dataset tools](docs/DATASET_CHECKS.md) | Inspect SQLite schemas and validate actual types, keys, and total references |
 | [Restricted ARM layer](docs/ARM_MAPPING.md) | Validate reviewed single-key mappings and create logical SQLite views/catalog; inspired by the Abstract Relational Model (ARM) |
 | [Python runner](docs/MODEL_PILOT.md) | Score prepared pairs; plan, replay, or make explicit live SQL/SQLP requests; load private credentials, preserve reasoning settings, journal responses and raw usage/status |
+| [Batch runner](docs/BATCH_PILOT.md) | Share context across questions with a JSON batch-size-1 control; count actual whole-response usage once |
+| [NatSQL condition](docs/NATSQL.md) | Generate NatSQL, run the pinned official converter under a declared schema profile, and retain conversion/wrong-answer failures |
 | [Study tools](docs/EXPERIMENT_KIT.md) | Freeze inputs/runtime, export [review packets](docs/REVIEW_PACKET.md), analyze paired records, and measure prepared-query sizes/timings |
+| [Contrasting data](docs/SNAPSHOT_EVALUATION.md) | Re-execute saved queries on supplied alternate snapshots; expose accidental agreement without new model calls |
+| [Join-view control](docs/JOIN_VIEWS.md) | Generate workload-independent flattened views and expose the same facts to both languages |
+| [Interactive lab](docs/DEMO_LAB.md) | Edit and execute queries locally, inspect paths and joins, and switch snapshots; no model calls |
 | [Browser viewer](docs/VIEWER.md) | Display saved queries, answers, diagnostics, tokens, path mappings, and optional ARM mapping artifacts using plain HTML/CSS/JavaScript |
 
-The current study workload uses a pinned **Chinook sample-store database**: nine
+The public sample workload uses a pinned **Chinook sample-store database**: nine
 tables, 6,874 rows, 12 development questions, and 30 reserved questions. Its 42
 prepared pairs pass both directly and through generated ARM views. These are the
 same questions in two setups, with human interpretation review still pending.
-See [the workload](docs/WORKLOAD.md).
+The study also uses 32 related synthetic path templates at depths 1, 2, 4, and 6,
+with two catalog widths and three valid snapshots. These are controlled cases,
+not independent databases. See [the workload](docs/WORKLOAD.md) and
+[controlled path study](examples/path_study/README.md).
 
 Data-lake discovery remains a possible extension. The current system receives
 approved relationships; it does not discover connections automatically. The
-optional [NatSQL adapter](docs/NATSQL.md) runs a pinned external converter, but a
-matched third model condition is not implemented.
+optional [NatSQL condition](docs/NATSQL.md) now has actual recorded model results.
+It uses a documented structural schema adapter rather than the full published
+NatSQL preprocessing pipeline.
 
 ## Evaluation
 
-The planned comparison uses the same model/settings, questions, data, and
+Each comparison uses the same model/settings, questions, data, and
 relationship facts, with a corresponding guide for each language. The current
 runner uses one attempt per condition. It checks expected values and duplicate
 counts and records all provider-reported input/output tokens, including guides
 and schema. Missing usage stays unknown. A repair loop is not implemented.
 
-Shorter query text alone does not establish lower total model usage. The
-[offline microbenchmarks](docs/OFFLINE_BENCHMARKS.md) measure prepared-query text
-and execution separately from model performance. The [first live pilot](docs/PILOT_RESULTS.md)
-keeps development outcomes separate from the still-unrun reserved questions.
+Across the three models, SQLP used 1.20–1.87% more total tokens in the native
+one-question protocol. With twelve questions sharing context, it used
+3.12–10.71% fewer, with every answer matching the supplied oracle. Batch-size-1
+JSON controls separate batching from output-format changes. These are bounded,
+exploratory observations; repeated templates and snapshots are correlated.
+The [full results](docs/STUDY_RESULTS.md) retain negative and mixed controls.
+Static [offline microbenchmarks](docs/OFFLINE_BENCHMARKS.md) remain separate.
 See [credential setup](docs/CREDENTIALS.md) before configuring a live run.
 
 ## Build and checks
@@ -130,10 +159,11 @@ make -j2 all test
 make test-viewer
 ```
 
-The first command builds both executables and runs the C++/Python suites plus
-1,200 differential compiler cases. The second needs Node.js and checks the local
-viewer without packages. Tests for the external NatSQL environment, downloaded
-Chinook source, and local tokenizer vocabulary skip when those inputs are absent.
+The first command builds both executables and runs the C++ suites, 354 Python
+tests, and 1,200 differential compiler cases. Optional integrations skip when
+their separate inputs are absent. The second runs 50 Node checks across the
+saved viewer and interactive lab, without packages. A Chromium walkthrough
+also passed 14 browser checks; conference rehearsal still needs human review.
 GitHub Actions runs the offline suites and exercises the viewer with generated
 prepared, deliberate-error, and replay reports.
 
@@ -145,9 +175,10 @@ mutation checks are described in [COMPILER_CHECKS.md](docs/COMPILER_CHECKS.md).
 
 - `src/`: C++ compiler and original path demo.
 - `tools/`: Python dataset, execution, experiment, and analysis tools.
-- `prompts/`: corresponding SQL and SQLP language guides.
-- `examples/`: academic fixtures, ARM mappings, and Chinook workload definitions.
-- `web/`: local saved-record viewer.
+- `prompts/`: corresponding SQL, SQLP, and NatSQL language guides.
+- `examples/`: academic fixtures, ARM mappings, Chinook definitions, and the
+  controlled path-study guide.
+- `web/`: saved-record viewer and interactive query lab.
 - `tests/`: compiler, protocol, data, analysis, and viewer checks.
 - `docs/`: [project direction](docs/IDEA.md), [agent context](docs/AGENTS.md),
   [delivery schedule](docs/SCHEDULES/SCHEDULE.md), and component guides.
