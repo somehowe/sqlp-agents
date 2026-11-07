@@ -3,64 +3,70 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SQLP Query Lab</title>
+  <meta name="theme-color" content="#f3f5fa">
+  <title>SQLP Path Studio</title>
   <link rel="stylesheet" href="lab.css">
   <script defer src="lab.js"></script>
 </head>
 <body>
   <div class="page">
-    <header class="header"><a class="wordmark" href="/">SQLP<span> / </span>QUERY LAB</a><span class="local-status">LOCAL EXECUTION <b>●</b> NO AI CALLS</span></header>
+    <header class="header"><a class="wordmark" href="/"><span class="brand-icon" aria-hidden="true">P<span>↗</span></span><span>SQLP <b>Path Studio</b></span></a><div class="header-end"><span class="research-label">QUERY LANGUAGE EXPLORER</span><span class="local-status"><b>●</b> LOCAL · NO AI CALLS</span></div></header>
     <main>
       <section class="hero">
-        <div><p class="eyebrow">AN INTERACTIVE QUERY LANGUAGE WORKBENCH</p><h1>Choose a path.<br>See the consequence.</h1></div>
-        <p class="hero-copy">Change a relationship, inspect the joins it becomes, and see which answers change. Same data. Visible assumptions.</p>
+        <div><p class="eyebrow">FROM NAMED RELATIONSHIPS TO REAL ANSWERS</p><h1>Follow the meaning.</h1><p class="hero-copy">A path says <em>which relationship</em>. Watch the compiler turn that choice into joins.</p></div>
+        <div class="hero-metrics" aria-label="Last completed query"><div><b id="stat-paths">—</b><span>named paths</span></div><div><b id="stat-joins">—</b><span>physical joins</span></div><div><b id="stat-rows">—</b><span>answer rows</span></div></div>
       </section>
       <p id="load-error" class="notice error" role="alert" hidden></p>
       <section class="question-panel" aria-labelledby="question-title">
-        <div class="control-row"><div class="control"><label for="scenario">Scenario</label><select id="scenario" disabled></select></div><div class="control"><label for="snapshot">Data snapshot</label><select id="snapshot" disabled></select></div></div>
-        <h2 id="question-title">Loading the registered scenarios…</h2>
-        <p class="question-note">Expected answers belong to the selected snapshot. A match is evidence on this instance, not a proof of general equivalence.</p>
+        <div class="question-main"><p class="eyebrow">THE QUESTION</p><h2 id="question-title">Loading the registered scenarios…</h2><p class="question-note">Explore a supplied scenario. Local edits are executed; model measurements are recorded separately.</p></div>
+        <div class="control-row"><div class="control"><label for="scenario">Choose a scenario</label><select id="scenario" disabled></select></div><div class="control"><label for="snapshot">Data snapshot</label><select id="snapshot" disabled></select></div></div>
       </section>
       <div class="workspace">
         <section class="panel editor-panel" aria-labelledby="editor-title">
-          <div class="panel-heading"><div><p class="eyebrow">01 / INTERVENE</p><h2 id="editor-title">Your query</h2></div><div class="segmented" role="group" aria-label="Query language"><button id="sqlp-tab" class="active" aria-pressed="true">SQLP</button><button id="sql-tab" aria-pressed="false">SQL</button></div></div>
+          <div class="panel-heading"><div><p class="eyebrow">01 / WRITE THE PATH</p><h2 id="editor-title">Your query</h2></div><div class="segmented" role="group" aria-label="Query language"><button id="sqlp-tab" class="active" aria-pressed="true">SQLP</button><button id="sql-tab" aria-pressed="false">SQL</button></div></div>
+          <div class="editor-file"><span class="file-dot"></span><span id="query-file-label">query.sqlp</span><span class="editor-key">⌘ / Ctrl + Enter</span></div>
           <label for="query" class="sr-only">Edit the query</label><textarea id="query" spellcheck="false" aria-describedby="editor-hint run-state"></textarea>
-          <p id="editor-hint" class="small muted">Try a different role or remove DISTINCT, then compile and execute locally.</p>
-          <div class="button-row"><button id="run" class="primary" disabled>Compile &amp; run <span aria-hidden="true">↗</span></button><button id="reset" class="quiet" disabled>Restore starting query</button></div>
+          <p id="editor-hint" class="small muted">Try a different role or remove DISTINCT, then run the query to see its effect.</p>
+          <div class="button-row"><button id="run" class="primary" disabled>Compile &amp; run <span aria-hidden="true">↗</span></button><button id="reset" class="quiet" disabled>Restore</button></div>
           <p id="run-state" class="run-state" role="status" aria-live="polite">Not run yet.</p>
-          <details class="starting"><summary>Starting query and recorded model usage</summary><p id="saved-label" class="small muted"></p><pre id="starting-query"></pre><div id="recorded-usage" class="usage"></div></details>
+<section class="panel translation-panel" aria-labelledby="translation-title">
+        <div class="translation-intro"><p class="eyebrow">03 / INSPECT THE EXPANSION</p><h2 id="translation-title">The path becomes SQL.</h2><p class="small muted">Blue lines belong to the selected path. Each role owns its alias, even when two roles reach the same physical table.</p><span id="join-count" class="pill">Waiting for query</span><div class="parameter-row"><span>BOUND VALUES</span><code id="parameters">—</code></div><p id="execution-note" class="small muted">Manual intervention. Provider usage is not generated by this interaction.</p></div>
+        <div class="translation-code"><div class="code-header"><span>SQLITE EXECUTION INPUT</span><span>Parameterized SQL</span></div><pre id="compiled" class="compiled">The C++ compiler expands named paths into parameterized SQL.</pre><p id="compile-error" class="notice error" role="alert" hidden></p></div>
+      </section>
+          <details class="starting"><summary>Starting query &amp; recorded usage</summary><p id="saved-label" class="small muted"></p><pre id="starting-query"></pre><div id="recorded-usage" class="usage"></div></details>
         </section>
-        <section class="panel translation-panel" aria-labelledby="translation-title">
-          <div class="panel-heading"><div><p class="eyebrow">02 / INSPECT</p><h2 id="translation-title">What SQLite executes</h2></div><span id="join-count" class="pill">Waiting for query</span></div>
-          <pre id="compiled" class="compiled">The C++ compiler expands named paths into parameterized SQL.</pre>
-          <div class="parameter-row"><span>BOUND PARAMETERS</span><code id="parameters">—</code></div>
-          <p id="compile-error" class="notice error" role="alert" hidden></p>
-          <p id="execution-note" class="small muted">Manual intervention. Provider usage is not generated by this interaction.</p>
+        <section class="panel path-panel" aria-labelledby="path-title">
+          <div class="panel-heading"><div><p class="eyebrow">02 / SEE THE RELATIONSHIPS</p><h2 id="path-title">One query. Every relationship.</h2></div><div class="segmented graph-mode" role="group" aria-label="Graph mode"><button id="graph-query" class="active" aria-pressed="true">Query graph</button><button id="graph-schema" aria-pressed="false">Catalog map</button></div></div>
+          <div id="paths" class="paths" aria-label="Compiled path occurrences"></div>
+          <div class="path-focus"><span class="path-focus-label">SELECTED PATH</span><code id="current-path">Run a SQLP query to begin</code><span id="path-length" class="path-length"></span></div>
+          <div class="canvas-shell"><div class="canvas-topline"><span id="trace-overview">Compiler-owned relationship trace</span><div class="canvas-legend"><span class="selected-key">Selected path</span><span>Other query roles</span></div></div><div id="graph" class="graph" aria-live="polite"></div><div class="canvas-toolbar"><div class="step-controls" role="group" aria-label="Step through selected path"><button id="path-prev" title="Previous hop" aria-label="Previous hop" disabled>←</button><button id="path-play" class="play-button" disabled><span aria-hidden="true">▶</span> Follow path</button><button id="path-next" title="Next hop" aria-label="Next hop" disabled>→</button><span id="path-status">Choose a path</span></div><div class="zoom-controls" role="group" aria-label="Graph viewport"><button id="graph-zoom-out" title="Zoom out" aria-label="Zoom out">−</button><button id="graph-fit" title="Fit graph">Fit</button><button id="graph-zoom-in" title="Zoom in" aria-label="Zoom in">+</button></div></div></div>
+          <p id="graph-caption" class="graph-caption">Select a path to connect its named roles to the joins below. Drag the canvas to explore.</p>
+          <div id="join-details" class="join-details"></div>
+          <div id="node-inspector" class="node-inspector" hidden><div class="inspector-heading"><div><p class="eyebrow">ACTUAL TABLE RECORDS</p><h3 id="node-inspector-title"></h3></div><button id="close-inspector" class="quiet" aria-label="Close table inspector">Close ×</button></div><p id="node-inspector-note" class="small muted"></p><div id="node-records" class="table-wrap"></div></div>
         </section>
       </div>
-      <section class="panel path-panel" aria-labelledby="path-title">
-        <div class="panel-heading"><div><p class="eyebrow">03 / FOLLOW THE ROLE</p><h2 id="path-title">A path is a chain of decisions.</h2></div><span class="small muted">Select a path occurrence</span></div>
-        <div id="paths" class="paths"></div><div id="graph" class="graph" aria-live="polite"></div><div id="join-details" class="join-details"></div>
-      </section>
+
       <section class="panel answer-panel" aria-labelledby="answer-title">
-        <div class="panel-heading"><div><p class="eyebrow">04 / CHECK THE CONSEQUENCE</p><h2 id="answer-title">The answer, including duplicates.</h2></div><span id="answer-verdict" class="pill">Not run</span></div>
+        <div class="panel-heading"><div><p class="eyebrow">04 / CHECK THE CONSEQUENCE</p><h2 id="answer-title">What changed in the answer?</h2></div><span id="answer-verdict" class="pill">Not run</span></div>
         <p id="result-context" class="small muted">No completed run yet.</p>
         <div id="answer-summary" class="answer-summary"></div>
-        <div class="answer-grid"><div><h3>Last completed answer</h3><div id="actual-answer" class="table-wrap"></div></div><div><h3>Expected answer for that run</h3><div id="expected-answer" class="table-wrap"></div></div></div>
-        <p class="small muted">All rows are scored as an unordered bag. Display previews show at most 20 rows.</p>
+        <div class="answer-grid"><div><h3><span class="answer-dot actual-dot"></span>Last completed answer</h3><div id="actual-answer" class="table-wrap"></div></div><div><h3><span class="answer-dot expected-dot"></span>Expected answer for that run</h3><div id="expected-answer" class="table-wrap"></div></div></div>
+        <p class="small muted">Scoring preserves every duplicate. Identical displayed rows are grouped with a multiplicity badge. A match on one snapshot is not a proof of equivalence.</p>
       </section>
       <section id="experiments-panel" class="panel experiments-panel" hidden aria-labelledby="experiments-title">
-        <p class="eyebrow">MEASURED MODEL RUNS / SEPARATE FROM MANUAL EDITS</p>
-        <h2 id="experiments-title">Shorter text and total tokens are different questions.</h2>
+        <p class="eyebrow">RECORDED MODEL EXPERIMENTS / SEPARATE FROM LOCAL EDITS</p>
+        <h2 id="experiments-title">When does the shorter path pay off?</h2>
+        <p class="small muted">Total tokens include the language guide, schema, question, output, and reported reasoning.</p>
+        <div id="cohort-chart" class="cohort-chart" hidden></div>
         <div id="experiment-controls" class="measurement-controls" hidden>
           <div class="control"><label for="experiment-select">Recorded model / workload preset</label><select id="experiment-select"></select></div>
-          <span class="recorded-label">RECORDED MEASUREMENTS · NOT REEXECUTED</span>
+          <span class="recorded-label">RECORDED · NOT REEXECUTED</span>
         </div>
         <p id="experiment-note" class="small muted"></p>
         <div id="experiments" aria-live="polite"></div>
       </section>
     </main>
-    <footer><span>Named roles → checked translation → observable answers</span><span>SQLP Query Lab · SQLite execution</span></footer>
+    <footer><span><strong>SQLP Path Studio</strong> · Named roles → checked joins → observable answers</span><span>C++ compiler · SQLite execution · Local only</span></footer>
   </div>
 </body>
 </html>

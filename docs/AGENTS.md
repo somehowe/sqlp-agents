@@ -4,7 +4,7 @@ Updated November 6, 2026. Read this for project context before working on the re
 
 ## Current direction and context
 
-Build one SQLP-to-SQL compiler written in C++, one reproducible agent comparison, and one interactive demo for the ICDE 2027 Demonstrations Track. A restricted ARM mapping/view layer is implemented and tested. The bounded exploratory study, interactive lab, working four-page paper, and captioned video are complete for review. Human interpretation review remains pending; the 30 reserved questions are unrun. Read [STUDY_RESULTS.md](STUDY_RESULTS.md) before proposing more experiments.
+Build one SQLP-to-SQL compiler written in C++, one reproducible agent comparison, and one interactive demo for the ICDE 2027 Demonstrations Track. A restricted ARM mapping/view layer is implemented and tested. The visual Path Studio and corrected NatSQL experiments are implemented; the working four-page paper and captioned video are being reviewed and refreshed against them. Human interpretation review remains pending; the 30 reserved questions are unrun. Read [STUDY_RESULTS.md](STUDY_RESULTS.md) before proposing more experiments.
 
 **Research question:** Given equivalent schema and relationship information, how does using SQLP instead of SQL affect AI agents' query correctness and total token usage?
 
@@ -17,7 +17,7 @@ The current user request and actual code take precedence over dated planning not
 ## Responsibilities and time
 
 | Person | Owns | Weekly time |
-|---|---|---|
+| --- | --- | --- |
 | Ryan | Required delivery: compiler, pilot/evaluation, thin demo, paper | 12–15 hours |
 | Iris | Considering a data-lake extension; any answer-review help here needs agreement | Availability unconfirmed |
 | Samridh | Planning a separate paper; previous demo role is an optional handoff only | No required tasks here |
@@ -36,33 +36,60 @@ The Python runner orchestrates execution; the local viewer consumes its saved re
 
 ## Actual code at this update
 
-The current checks cover the C++ suites, 354 Python tests, 1,200 differential
-queries, and 50 Node checks (23 saved-viewer plus 27 lab checks). Optional
+The current checks cover the C++ suites, 360 Python tests, 1,200 differential
+queries, and 61 Node checks (23 saved-viewer plus 38 Path Studio checks). Optional
 integrations skip when their separate inputs are unavailable; fresh checkouts
 can have more skips than Ryan's configured environment. A real Chromium
-walkthrough passed 14 browser checks. Recheck the current tree before claiming
-new changes passed. Tests are implementation checks, not model evidence.
+walkthrough passed 26 categories (14 original plus 12 visual-studio checks).
+Recheck the current tree before claiming new changes passed. Tests are implementation checks, not model evidence.
 
-The completed [study](STUDY_RESULTS.md) has 81 validated reports, 2,196 real model
-calls, and 2,556 scored query attempts: 12 Chinook development questions and 32
-related synthetic templates, three same-provider models, and three repetitions
-per condition. It includes native generation, JSON batches, NatSQL, wider
-catalogs, optional join views, and a post-hoc required-view follow-up. All
-failures remain included. Repeated templates/snapshots are not independent
-research tasks. Human semantic review remains pending; no reserved calls ran.
+The historical [study archive](STUDY_RESULTS.md) contains 108 reports, 2,628
+experimental API calls, and 2,988 generated/scored outputs, including 108
+superseded NatSQL calibration calls. Those first prompts wrongly omitted native
+flat IN; their old 33/36 scores must not be used as evidence of SQLP superiority.
+The valid original SQL/SQLP matrix is 1,872 calls/2,232 outputs, plus 216/216 in the
+post-hoc required-view follow-up. A fresh 324-call corrected three-language study
+and separate 108-call post-hoc NatSQL-guide sensitivity have their own frozen kits.
 
-The full local archive is `resources/experiments/demo-study-2026-11-06/`, with
-frozen inputs, raw journals, reports, validated summary, and cumulative spending
-ledger. The earlier six-run pilot remains separate. The [public offline example](OFFLINE_EXAMPLE.md)
-reproduces prepared/synthetic records without API access. The new
-[demo bundle and query lab](DEMO_LAB.md) provide a fresh-checkout, no-key audience
-walkthrough: edit a query, inspect joins, and switch valid snapshots. Its default
-bundle is prepared, while recorded model bundles remain separately labeled.
-The [review packets](REVIEW_PACKET.md) expose questions and row bags for human
-checks; exporting or annotating a packet does not certify that review occurred.
+Corrected V2 answer matches, with 36 attempts per cell:
+
+| Model | SQL | SQLP | NatSQL |
+| --- | ---: | ---: | ---: |
+| Sol | 36/36 | 36/36 | 36/36 |
+| Luna | 35/36 | 36/36 | 33/36 |
+| Astra | 36/36 | 36/36 | 36/36 |
+
+All NatSQL outputs convert; three Luna executions time out. With generic IN-block
+clarification (V3), NatSQL matches 36/36 for Sol/Astra and 35/36 for Luna, with one
+execution timeout but higher total usage. Keep both guide versions and count all
+input/output. Their instruction lengths differ; gains are not intrinsic syntax
+constants. The study has twelve Chinook cases and 32 related templates, three
+same-provider models, and three repetitions. Human semantic review is pending;
+reserved questions remain unrun.
+
+Local archives under `resources/experiments/`: `demo-study-2026-11-06/`,
+`natsql-corrected-2026-11-06/`, and `natsql-guide-sensitivity-2026-11-06/`.
+Their validators bind prompts, journals, raw responses, usage, inputs and scores.
+The earlier six-run pilot remains separate. All paid studies share one private
+cumulative spending ledger; no process renews the authorized $100 ceiling.
+
+The [offline example](OFFLINE_EXAMPLE.md) and [prepared Path Studio bundle](DEMO_LAB.md)
+work without private data or API access. The studio shows simultaneous role/alias
+branches, SQL highlighting, animated path steps, pan/zoom/Fit, a catalog map,
+bounded actual table samples, duplicate-sensitive answers, and recorded cost
+charts. Animation explains the compiler trace, not execution time or lineage;
+table previews are samples, not result provenance. Recorded bundles may add
+NatSQL cards, but manual execution languages remain SQL and SQLP. No arbitrary
+English-question model generation is wired into the local demo.
+
+An additional 6,204 offline gold reconstructions validate the official NatSQL
+converter on all 1,034 Spider examples, using author-linked databases and published
+preprocessed metadata. They are not new model calls or a reproduction of original
+trained-model accuracy. See [NATSQL.md](NATSQL.md). Review packets still need real
+human interpretation checks; exporting one does not certify review occurred.
 
 | Files | Present behavior |
-|---|---|
+| --- | --- |
 | `src/path.h` | Owned root alias and feature vector; rejects empty components. Representation supports longer paths. |
 | `src/mapping.h`, `.cc` | Five-field `ReferenceMapping`; lookup by source table and feature name. |
 | `src/catalog.h`, `.cc` | Tables, Integer/String columns, uniqueness declarations, references, column lookup. |
@@ -77,11 +104,11 @@ checks; exporting or annotating a packet does not certify that review occurred.
 | `tools/run_comparison.py` | Prepared SQL/SQLP execution, row-bag answer checking, typed records, and per-condition diagnostics/limits on one read-only snapshot. No model calls or usage estimates. See [QUERY_COMPARISON.md](QUERY_COMPARISON.md). |
 | `tools/run_pilot.py`, `tools/model_provider.py`, `prompts/` | Dry-run requests, request-bound replay, one first attempt per language, raw provider usage/status, durable response journals, and artifact hashes. Explicit live adapter has been used; private key-file loading and explicit reasoning effort are supported. See [MODEL_PILOT.md](MODEL_PILOT.md). |
 | `tools/batch_pilot.py` | Shared-context JSON batches with B1/B4/B12 controls; provider usage belongs to the whole response, never an invented per-query allocation. See [BATCH_PILOT.md](BATCH_PILOT.md). |
-| `tools/prepare_path_study.py`, `examples/path_study/` | 32 matched synthetic templates at depths 1/2/4/6, two catalog widths, and alternate valid snapshots. Reference queries and Python record-walk answers share authored path plans; separate execution checks do not supply independent semantic gold. Human interpretation review is pending. |
+| `tools/prepare_path_study.py`, `examples/path_study/` | 32 matched synthetic templates at depths 1, 2, 4, and 6, two catalog widths, and alternate valid snapshots. Reference queries and Python record-walk answers share authored path plans; separate execution checks do not supply independent semantic gold. Human interpretation review is pending. |
 | `tools/prepare_join_views.py` | Workload-independent, fixed-depth catalog views and a language-neutral mapping guide exposed to both conditions. See [JOIN_VIEWS.md](JOIN_VIEWS.md). |
 | `tools/evaluate_snapshots.py` | Re-score saved queries on supplied alternate databases with no new model usage. Diagnostic evidence, not equivalence proof. See [SNAPSHOT_EVALUATION.md](SNAPSHOT_EVALUATION.md). |
 | `tools/research_budget.py` | Durable shared spending reservations and raw response retention for explicitly authorized calls; estimates are not invoices. |
-| `tools/demo_bundle.py`, `tools/demo_server.py`, `web/lab.*` | Reproducible prepared bundle and loopback-only manual SQL/SQLP execution, path graph, and snapshot switching. No model calls or invented usage. See [DEMO_LAB.md](DEMO_LAB.md). |
+| `tools/demo_bundle.py`, `tools/demo_server.py`, `web/lab.*` | Prepared bundle and local Path Studio: branching aliases, SQL highlights/step playback, catalog map, bounded table previews, duplicate badges, snapshot edits, and recorded token charts. No model calls. See [DEMO_LAB.md](DEMO_LAB.md). |
 | `tools/compiler_catalog.py` | Private bounded catalog argument files shared by both runners; avoids OS argv limits while keeping the JSON catalog semantics unchanged. |
 | `tools/analyze_runs.py` | Descriptive paired correctness, failures, token totals/distributions and known-pair deltas; rejects incomplete or inconsistent batches. See [ANALYSIS.md](ANALYSIS.md). |
 | `tools/experiment_kit.py` | Freeze and verify data/compiler/source/guides/questions and private scoring material; produce exact dry-run requests from the copied runtime. No API calls. See [EXPERIMENT_KIT.md](EXPERIMENT_KIT.md). |
@@ -216,13 +243,14 @@ Compare result values and multiplicity, not exact SQL strings. Execution success
 
 The full paired results are recorded in [STUDY_RESULTS.md](STUDY_RESULTS.md): SQLP used more total tokens for native independent requests and fewer in shared-context batches on these tasks. This does not establish general efficiency or accuracy superiority. Earlier scripted probes establish feasibility and illustrate failure cases. The human SQLP study motivates the agent question; NatSQL/DIN-SQL already use intermediate representations and DAIL-SQL studies token efficiency. The proposed interest is named relationship roles, path length, and full interaction tokens. Stronger compiler checks mean the tested contribution is **SQLP plus compiler/checker**; syntax-only claims require further controls. Report positive, mixed, or negative findings without promising acceptance.
 
-NatSQL has an actual standalone condition, not a relabeled SQL/SQLP run. Its
-pinned official converter uses a reviewed structural adapter rather than the
-full published preprocessing pipeline. Each model matched 33/36 answers; all
-nine six-table attempts were rejected during conversion and remain failures.
-Earlier handwritten checks are separate compatibility evidence. Do not exclude
-the failing case, claim an expressiveness impossibility, or treat this as a
-complete NatSQL reproduction. See [NATSQL.md](NATSQL.md).
+NatSQL has actual standalone model conditions, not relabeled SQL/SQLP records.
+Its first guide was defective because it excluded native flat IN. Preserve that
+archive as calibration; do not claim SQLP superiority from its failures. Fresh
+V2 comparisons and V3 guide sensitivity retain every attempted task and full
+usage, and must remain separate. Use their frozen guides rather than assuming
+current prompts reproduce older runs. The official-gold reconstruction check
+uses published metadata; Chinook uses a declared structural adapter. Neither
+reproduces the original paper's complete trained-model system. See [NATSQL.md](NATSQL.md).
 
 The join-view control expands all catalog prefixes through a fixed depth,
 without reading questions or gold. Optional views were used in only 25/108 SQL
@@ -237,8 +265,8 @@ The offline Chinook microbenchmark found shorter SQLP prepared queries (35.9% fe
 ## Delivery and paper context
 
 | Checkpoint, 2026 | Target |
-|---|---|
-| Nov 6 — ready | Complete exploratory study, interactive manual lab, working four-page PDF, and short captioned video. |
+| --- | --- |
+| Nov 6 — review | Visual Path Studio, corrected comparisons and guide sensitivity complete; refresh local paper/video and obtain mentor review. |
 | Nov 7 | Trace and explain a real example; check question meanings, duplicate handling, and claims. |
 | Nov 9 | Mentor walkthrough of paper and demonstration if available; internal target, not an official outline deadline. |
 | Nov 11 | Freeze submission claims/scenarios after feedback; freeze any optional reserved follow-up before calls. |

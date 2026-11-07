@@ -195,6 +195,61 @@ class FullConverterTests(unittest.TestCase):
             "and UNIVERSITY.country = 'CA'", "SELECT DISTINCT a.name FROM WROTE w JOIN AUTHOR a "
             "ON w.author_aid=a.aid JOIN UNIVERSITY u ON a.uni_id=u.uid WHERE u.country='CA'")
 
+    def test_full_flat_in_reconstructs_a_six_table_existence_query(self):
+        # Native NatSQL uses a flat IN relation to infer a subquery. A guide
+        # restricted to literal equalities would exclude this supported form.
+        # This public fixture needs no benchmark download or private answers.
+        tables = {
+            "Customer": [("cid", "integer", True), ("email", "string", False)],
+            "Invoice": [("iid", "integer", True), ("cid", "integer", False)],
+            "InvoiceLine": [("lid", "integer", True), ("iid", "integer", False), ("tid", "integer", False)],
+            "Track": [("tid", "integer", True), ("aid", "integer", False)],
+            "Album": [("aid", "integer", True), ("artist_id", "integer", False)],
+            "Artist": [("artist_id", "integer", True), ("name", "string", False)],
+        }
+        references = [("Invoice", "customer", "cid", "Customer", "cid"),
+                      ("InvoiceLine", "invoice", "iid", "Invoice", "iid"),
+                      ("InvoiceLine", "track", "tid", "Track", "tid"),
+                      ("Track", "album", "aid", "Album", "aid"),
+                      ("Album", "artist", "artist_id", "Artist", "artist_id")]
+        catalog = {"version": 1, "tables": [
+            {"name": name, "columns": [
+                {"name": c, "type": kind, "unique": unique}
+                for c, kind, unique in columns]} for name, columns in tables.items()],
+            "references": [dict(zip(("source_table", "feature", "source_column",
+                                      "target_table", "target_column"), ref))
+                           for ref in references]}
+        database = self.directory / "six-tables.sqlite"
+        with sqlite3.connect(database) as connection:
+            for name, columns in tables.items():
+                declaration = ", ".join(c + (" INTEGER" if kind == "integer" else " TEXT") +
+                                        (" PRIMARY KEY" if unique else " NOT NULL")
+                                        for c, kind, unique in columns)
+                connection.execute("CREATE TABLE " + name + "(" + declaration + ")")
+            connection.executescript("""
+                INSERT INTO Customer VALUES(1,'ada@example'),(2,'bob@example'),(3,'cy@example');
+                INSERT INTO Invoice VALUES(10,1),(11,1),(12,2),(13,3);
+                INSERT INTO Artist VALUES(100,'Queen'),(101,'Other');
+                INSERT INTO Album VALUES(200,100),(201,101);
+                INSERT INTO Track VALUES(300,200),(301,201);
+                INSERT INTO InvoiceLine VALUES(1,10,300),(2,10,300),(3,11,300),(4,12,301),(5,13,300);
+            """)
+        query = ("select distinct Customer.email from Customer where "
+                 "Customer.cid in Invoice.cid and Artist.name = 'Queen'")
+        result = adapter.convert(query, database, catalog,
+            upstream=os.environ["SQLP_NATSQL_UPSTREAM"],
+            python=os.environ["SQLP_NATSQL_PYTHON"], nltk_data=os.environ["SQLP_NATSQL_DATA"])
+        self.assertTrue(result["ok"], result)
+        with sqlite3.connect(database) as connection:
+            actual = connection.execute(result["sql"]).fetchall()
+            expected = connection.execute("""SELECT DISTINCT c.email FROM Customer c
+                JOIN Invoice i ON i.cid=c.cid JOIN InvoiceLine l ON l.iid=i.iid
+                JOIN Track t ON t.tid=l.tid JOIN Album a ON a.aid=t.aid
+                JOIN Artist r ON r.artist_id=a.artist_id WHERE r.name='Queen'""").fetchall()
+        self.assertEqual(Counter(actual), Counter(expected))
+        self.assertEqual(Counter(actual), Counter([("ada@example",), ("cy@example",)]))
+        self.assertIn(" in (select ", result["sql"].lower())
+
     def test_full_unknown_column_is_query_failure(self):
         result = self.full("select AUTHOR.missing from AUTHOR")
         self.assertFalse(result["ok"])
