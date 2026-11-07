@@ -15,7 +15,8 @@ import tempfile
 import threading
 
 from .compiler_catalog import catalog_argument_file
-from .run_comparison import DEFAULT_COMPILER, SetupError, _check_workload, _compile, _condition, _rows
+from .run_comparison import (DEFAULT_COMPILER, QueryError, SetupError, _check_workload,
+                             _compile, _condition, _execute, _rows)
 from .validate_dataset import _unique_object, compiler_arguments, validate_dataset
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +24,8 @@ MAX_BUNDLE_BYTES = 4 * 1024 * 1024
 MAX_BODY_BYTES = 32 * 1024
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 MAX_DATABASE_BYTES = 64 * 1024 * 1024
+PREVIEW_ROWS = 8
+PREVIEW_COLUMNS = 16
 STATIC = {"/": ("lab.html", "text/html"), "/lab.html": ("lab.html", "text/html"),
           "/lab.js": ("lab.js", "text/javascript"), "/lab.css": ("lab.css", "text/css")}
 POLICY = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
@@ -187,6 +190,49 @@ class DemoLab:
                 "expected_rows": _rows(snapshot["expected_rows"]),
                 "note": "Matches supplied snapshot answer; not a proof of general query equivalence."}
 
+    def preview(self, request):
+        """Show real table samples without interpreting them as query lineage.
+
+        Browsers choose only registered names. Identifiers come from the frozen
+        catalog, and all generated statements use the shared read-only scorer.
+        """
+        if not isinstance(request, dict) or set(request) != {"scenario", "snapshot", "table"}:
+            raise ValueError("Preview requires scenario, snapshot, and table")
+        if any(not isinstance(value, str) for value in request.values()):
+            raise ValueError("Preview fields must be text")
+        scenario = self.scenarios.get(request["scenario"])
+        if scenario is None or request["snapshot"] not in scenario["snapshots"]:
+            raise ValueError("Unknown registered scenario or snapshot")
+        table = next((item for item in scenario["catalog"]["tables"]
+                      if item["name"] == request["table"]), None)
+        if table is None:
+            raise ValueError("Unknown registered table")
+        quote = lambda value: '"' + value.replace('"', '""') + '"'
+        selected_columns = table["columns"][:PREVIEW_COLUMNS]
+        sql = ("SELECT " + ", ".join(quote(column["name"]) for column in selected_columns)
+               + " FROM " + quote(table["name"]) + " LIMIT " + str(PREVIEW_ROWS))
+        snapshot = scenario["snapshots"][request["snapshot"]]
+        try:
+            with closing(sqlite3.connect(snapshot["database"].as_uri() + "?mode=ro",
+                                         uri=True, cached_statements=0)) as connection:
+                connection.execute("BEGIN")
+                connection.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, 16384)
+                connection.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH, MAX_BODY_BYTES * 2)
+                columns, rows = _execute(connection, sql, [], PREVIEW_ROWS, self.timeout)
+                _, count = _execute(connection, "SELECT count(*) FROM " + quote(table["name"]),
+                                    [], 1, self.timeout)
+        except QueryError as error:
+            raise SetupError("preview", "Registered table preview unavailable") from error
+        return {"version": 1, "origin": "registered_snapshot_table_sample", "ai_calls": 0,
+                "scenario": scenario["id"], "snapshot": request["snapshot"],
+                "snapshot_sha256": snapshot["sha256"], "table": table["name"],
+                "columns": columns, "rows": _rows(rows), "row_count": count[0][0],
+                "preview_limit": PREVIEW_ROWS, "has_more": count[0][0] > len(rows),
+                "column_count": len(table["columns"]),
+                "columns_truncated": len(table["columns"]) > PREVIEW_COLUMNS,
+                "note": "Sample table records from this snapshot; not query results or row provenance. "
+                        "Sample order is unspecified."}
+
 
 def create_server(lab, port=8765):
     semaphore = threading.BoundedSemaphore(4)
@@ -245,7 +291,7 @@ def create_server(lab, port=8765):
         def do_POST(self):
             if not self.allowed():
                 self.respond(403, {"error": "Local origin required"}); return
-            if self.path != "/api/run":
+            if self.path not in ("/api/run", "/api/preview"):
                 self.respond(404, {"error": "Not found"}); return
             lengths = self.headers.get_all("Content-Length", [])
             if self.headers.get("Transfer-Encoding") or len(lengths) != 1 or not lengths[0].isdigit():
@@ -263,7 +309,7 @@ def create_server(lab, port=8765):
                     raise ValueError("Incomplete JSON request")
                 request = _json(encoded)
                 try:
-                    result = lab.run(request)
+                    result = lab.run(request) if self.path == "/api/run" else lab.preview(request)
                 except SetupError:
                     self.respond(503, {"error": "Compiler or registered dataset unavailable"})
                 else:

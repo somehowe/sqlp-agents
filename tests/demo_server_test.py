@@ -185,6 +185,84 @@ class DemoServerTests(unittest.TestCase):
             else: bundle["scenarios"][0]["snapshots"]["original"]["expected_rows"] = [["too", "wide"]]
             with self.subTest(change=change), self.assertRaises(ValueError): DemoLab(bundle)
 
+    def test_table_preview_reads_real_registered_records_with_typed_cells(self):
+        preview = self.lab.preview({"scenario": self.scenario["id"], "snapshot": "original",
+                                    "table": "AUTHOR"})
+        with sqlite3.connect(self.original) as connection:
+            rows = connection.execute("SELECT aid, name, uni_id, mentor_aid FROM AUTHOR").fetchall()
+        self.assertEqual(preview["columns"], ["aid", "name", "uni_id", "mentor_aid"])
+        self.assertEqual(preview["row_count"], len(rows))
+        self.assertEqual(preview["rows"][0][1], {"type": "string", "value": rows[0][1]})
+        self.assertEqual(preview["rows"][0][0], {"type": "int64", "value": str(rows[0][0])})
+        self.assertEqual(preview["ai_calls"], 0)
+        self.assertIn("not query results or row provenance", preview["note"])
+        self.assertNotIn(self.lab.directory.name, json.dumps(preview))
+
+    def test_preview_uses_frozen_selected_snapshot_and_preserves_duplicates(self):
+        request = {"scenario": self.scenario["id"], "snapshot": "original", "table": "WROTE"}
+        original = self.lab.preview(request)
+        with sqlite3.connect(self.original) as connection:
+            connection.execute("DELETE FROM WROTE")
+        self.assertEqual(self.lab.preview(request), original)
+        contrast = self.lab.preview({**request, "snapshot": "contrast1"})
+        self.assertEqual(contrast["row_count"], original["row_count"] + 1)
+        self.assertNotEqual(contrast["snapshot_sha256"], original["snapshot_sha256"])
+        self.assertEqual(len(contrast["rows"]), len(original["rows"]) + 1)
+
+    def test_preview_rejects_unregistered_names_and_browser_sql_or_file_paths(self):
+        request = {"scenario": self.scenario["id"], "snapshot": "original", "table": "AUTHOR"}
+        changes = ({"table": "sqlite_master"}, {"table": "AUTHOR; DELETE FROM WROTE;"},
+                   {"snapshot": str(self.original)}, {"database": str(self.original)},
+                   {"query": "SELECT * FROM AUTHOR;"}, {"table": 3}, {"scenario": "missing"})
+        for change in changes:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                self.lab.preview({**request, **change})
+
+    def test_preview_bounds_rows_columns_and_quotes_catalog_identifiers(self):
+        path = self.directory / "quoted.sqlite"
+        table = 'T"able'
+        columns = ['k"ey'] + ["value" + str(i) for i in range(19)]
+        quote = lambda name: '"' + name.replace('"', '""') + '"'
+        with sqlite3.connect(path) as connection:
+            connection.execute("CREATE TABLE " + quote(table) + "(" + ",".join(
+                quote(name) + " INTEGER" for name in columns) + ")")
+            connection.executemany("INSERT INTO " + quote(table) + " VALUES (" +
+                                   ",".join("?" for _ in columns) + ")",
+                                   [tuple([i] * len(columns)) for i in range(20)])
+        query = 'SELECT r."k""ey" FROM "T""able" AS r;'
+        bundle = {"version": 1, "scenarios": [{"id": "quoted", "question": "List keys.",
+                  "column_count": 1, "sql": query, "sqlp": query,
+                  "catalog": {"version": 1, "tables": [{"name": table, "columns": [
+                      {"name": name, "type": "integer", "unique": i == 0}
+                      for i, name in enumerate(columns)]}], "references": []},
+                  "snapshots": {"original": {"database": str(path),
+                                              "expected_rows": [[i] for i in range(20)]}}}]}
+        lab = DemoLab(bundle)
+        self.addCleanup(lab.close)
+        preview = lab.preview({"scenario": "quoted", "snapshot": "original", "table": table})
+        self.assertEqual((len(preview["rows"]), len(preview["columns"])), (8, 16))
+        self.assertEqual(preview["row_count"], 20)
+        self.assertEqual(preview["column_count"], 20)
+        self.assertTrue(preview["has_more"])
+        self.assertTrue(preview["columns_truncated"])
+        self.assertEqual(preview["columns"][0], 'k"ey')
+
+    def test_http_preview_executes_only_registered_table_sampling(self):
+        port = self.start()
+        request = {"scenario": self.scenario["id"], "snapshot": "original", "table": "AUTHOR"}
+        status, _, body = self.request(port, "POST", "/api/preview", json.dumps(request),
+                                       {"Content-Type": "application/json"})
+        self.assertEqual(status, 200)
+        preview = json.loads(body)
+        self.assertEqual(preview["origin"], "registered_snapshot_table_sample")
+        self.assertEqual(preview["table"], "AUTHOR")
+        self.assertGreater(preview["row_count"], 0)
+        self.assertNotIn(str(ROOT).encode(), body)
+        for change in ({"table": "sqlite_master"}, {"database": str(self.original)}):
+            with self.subTest(change=change):
+                self.assertEqual(self.request(port, "POST", "/api/preview", json.dumps({**request, **change}),
+                                              {"Content-Type": "application/json"})[0], 400)
+
 
 class OptionalBrowserLogicTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("node"), "Node.js is optional for browser checks")

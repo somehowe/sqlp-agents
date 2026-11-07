@@ -94,7 +94,7 @@ async function lab({scenarios = [scenario(),scenario("other")],experiments,befor
     createElementNS: (_, tag) => document.createElement(tag)
   };
   const fetch = (url, options) => {
-    assert.ok(url === "/api/scenarios" || url === "/api/run", "Only registered local API routes may be requested");
+    assert.ok(url === "/api/scenarios" || url === "/api/run" || url === "/api/preview", "Only registered local API routes may be requested");
     let resolve, reject;
     const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
     calls.push({url,options,resolve,reject});
@@ -342,4 +342,165 @@ test("legacy tables and invalid preset data retain an inert readable fallback",a
   const invalid = await lab({experiments:{groups:[group("duplicate"),group("duplicate")]}});
   assert.equal(invalid.elements["experiment-controls"].hidden,true);
   assert.match(invalid.elements.experiments.textContent,/"groups"/);
+});
+
+// A branched trace: two roles reach UNIVERSITY through distinct aliases.
+function branchFixture() {
+  const source = scenario("canadian_authors_danish_publishers");
+  source.catalog = {version:1,tables:[
+    {name:"WROTE",columns:[{name:"author_aid"},{name:"paper_pid"}]},
+    {name:"AUTHOR",columns:[{name:"aid"},{name:"name"},{name:"uni_id"}]},
+    {name:"PAPER",columns:[{name:"pid"},{name:"publisher_uid"}]},
+    {name:"UNIVERSITY",columns:[{name:"uid"},{name:"country"}]}],references:[
+      {source_table:"WROTE",source_column:"author_aid",feature:"author",target_table:"AUTHOR",target_column:"aid"},
+      {source_table:"AUTHOR",source_column:"uni_id",feature:"university",target_table:"UNIVERSITY",target_column:"uid"},
+      {source_table:"WROTE",source_column:"paper_pid",feature:"paper",target_table:"PAPER",target_column:"pid"},
+      {source_table:"PAPER",source_column:"publisher_uid",feature:"publisher",target_table:"UNIVERSITY",target_column:"uid"}]};
+  const join = (role,st,sa,sc,tt,ta,tc) => ({role,source:{table:st,alias:sa,column:sc},target:{table:tt,alias:ta,column:tc}});
+  const joins = [join("author","WROTE","w","author_aid","AUTHOR","w_ref0","aid"),
+    join("university","AUTHOR","w_ref0","uni_id","UNIVERSITY","w_ref1","uid"),
+    join("paper","WROTE","w","paper_pid","PAPER","w_ref2","pid"),
+    join("publisher","PAPER","w_ref2","publisher_uid","UNIVERSITY","w_ref3","uid")];
+  const paths = [
+    {root:"w",features:["author","name"],clause:"select",index:0,join_ids:[0],column:{table:"AUTHOR",alias:"w_ref0",column:"name"}},
+    {root:"w",features:["author","university","country"],clause:"where",index:0,join_ids:[0,1],column:{table:"UNIVERSITY",alias:"w_ref1",column:"country"}},
+    {root:"w",features:["paper","publisher","country"],clause:"where",index:1,join_ids:[2,3],column:{table:"UNIVERSITY",alias:"w_ref3",column:"country"}}];
+  const response=result();
+  response.run.trace={joins,paths};
+  response.run.sql='SELECT "w_ref0"."name"\nFROM "WROTE" AS "w"\n'+joins.map(j=>`JOIN "${j.target.table}" AS "${j.target.alias}" ON "${j.source.alias}"."${j.source.column}" = "${j.target.alias}"."${j.target.column}"`).join("\n")+'\nWHERE "w_ref1"."country" = ? AND "w_ref3"."country" = ?;';
+  return {source,response};
+}
+const descendants = element => [element,...element.children.flatMap(descendants)];
+const graphNodes = element => descendants(element).filter(item=>item.attributes["data-alias"]!==undefined);
+const highlightedJoins = e => nodesWithClass(e.compiled,"path-highlight").map(item=>Number(item.attributes["data-join-id"]));
+
+test("the default showcase keeps both relationship branches and distinct physical aliases visible",async () => {
+  const fixture=branchFixture(),ui=await lab({scenarios:[scenario(),fixture.source]}),e=ui.elements;
+  assert.equal(JSON.parse(ui.calls[1].options.body).scenario,fixture.source.id);
+  assert.match(e.scenario.children[1].textContent,/Author affiliation vs publisher/);
+  await ui.finish(fixture.response);
+  const nodes=graphNodes(e.graph);
+  assert.equal(nodes.length,5);
+  assert.deepEqual(nodes.filter(item=>item.attributes["data-table"]==="UNIVERSITY").map(item=>item.attributes["data-alias"]),["w_ref1","w_ref3"]);
+  assert.match(e["graph-caption"].textContent,/UNIVERSITY appears as 2 distinct aliases/);
+  assert.equal(e.compiled.textContent,fixture.response.run.sql,"Highlight markup must preserve the exact compiler SQL bytes");
+  assert.deepEqual(highlightedJoins(e),[0,1]);
+  e.paths.children[2].fire("click");
+  assert.equal(e["current-path"].textContent,"w.paper.publisher.country");
+  assert.deepEqual(highlightedJoins(e),[2,3]);
+  assert.equal(graphNodes(e.graph).length,5,"Selecting a path must not remove competing query roles");
+  assert.equal(ui.calls.length,2,"Path selection is local inspection, not execution");
+});
+
+test("manual hop stepping reveals only the actual joins in sequence and clamps at both bounds",async () => {
+  const fixture=branchFixture(),ui=await lab({scenarios:[fixture.source]}),e=ui.elements;await ui.finish(fixture.response);
+  e.paths.children[2].fire("click");
+  e["path-next"].fire("click");assert.deepEqual(highlightedJoins(e),[]);assert.match(e["path-status"].textContent,/Start · w/);
+  e["path-next"].fire("click");assert.deepEqual(highlightedJoins(e),[2]);assert.match(e["path-status"].textContent,/Hop 1\/2 · paper/);
+  e["path-next"].fire("click");assert.deepEqual(highlightedJoins(e),[2,3]);assert.match(e["path-status"].textContent,/Hop 2\/2 · publisher/);
+  e["path-next"].fire("click");assert.deepEqual(highlightedJoins(e),[2,3]);
+  for(let i=0;i<4;i++)e["path-prev"].fire("click");
+  assert.deepEqual(highlightedJoins(e),[]);assert.match(e["path-status"].textContent,/Start · w/);
+  assert.equal(ui.calls.length,2);
+});
+
+test("catalog mode shows physical tables rather than alias instances without executing a query",async () => {
+  const fixture=branchFixture(),ui=await lab({scenarios:[fixture.source]}),e=ui.elements;await ui.finish(fixture.response);
+  const sql=e.compiled.textContent;
+  e["graph-schema"].fire("click");
+  assert.equal(graphNodes(e.graph).length,4);
+  assert.equal(graphNodes(e.graph).filter(item=>item.attributes["data-table"]==="UNIVERSITY").length,1);
+  assert.match(e["trace-overview"].textContent,/4 catalog tables · 4 declared roles/);
+  assert.equal(e["path-next"].disabled,true);
+  assert.equal(e.compiled.textContent,sql);
+  e["graph-query"].fire("click");
+  assert.equal(graphNodes(e.graph).length,5);assert.equal(e["path-next"].disabled,false);
+  assert.equal(ui.calls.length,2);
+});
+
+test("zoom and fit affect the SVG viewport without changing query contents or results",async () => {
+  const fixture=branchFixture(),ui=await lab({scenarios:[fixture.source]}),e=ui.elements;await ui.finish(fixture.response);
+  const svg=e.graph.children[0],original=svg.attributes.viewBox,answer=e["actual-answer"].textContent,query=e.query.value;
+  e["graph-zoom-in"].fire("click");assert.ok(Number(svg.attributes.viewBox.split(" ")[2])<Number(original.split(" ")[2]));
+  e["graph-fit"].fire("click");assert.equal(svg.attributes.viewBox,original);
+  assert.equal(e.query.value,query);assert.equal(e["actual-answer"].textContent,answer);assert.equal(ui.calls.length,2);
+});
+
+test("mouse interaction with a graph node does not capture the canvas pointer away from its click",async () => {
+  const fixture=branchFixture(),ui=await lab({scenarios:[fixture.source]}),e=ui.elements;await ui.finish(fixture.response);
+  const svg=e.graph.children[0],item=graphNodes(e.graph)[0];let captured=false;
+  svg.setPointerCapture=()=>{captured=true;};
+  svg.fire("pointerdown",{button:0,clientX:20,clientY:20,pointerId:1,target:{closest:()=>item}});
+  assert.equal(captured,false,"Panning must not retarget a table-node click onto the SVG");
+  item.fire("click");
+  assert.equal(ui.calls[2].url,"/api/preview");
+});
+
+test("a node inspector requests only registered table samples and labels them separately from answer provenance",async () => {
+  const fixture=branchFixture(),ui=await lab({scenarios:[fixture.source]}),e=ui.elements;await ui.finish(fixture.response);
+  const item=graphNodes(e.graph).find(item=>item.attributes["data-alias"]==="w_ref1");item.fire("click");
+  assert.equal(ui.calls[2].url,"/api/preview");
+  assert.deepEqual(JSON.parse(ui.calls[2].options.body),{scenario:fixture.source.id,snapshot:"original",table:"UNIVERSITY"});
+  await ui.respond(2,{columns:["uid","country"],rows:[[{type:"integer",value:1},{type:"string",value:"CA"}]],row_count:4,preview_limit:8});
+  assert.equal(e["node-inspector"].hidden,false);
+  assert.match(e["node-inspector-title"].textContent,/UNIVERSITY · alias w_ref1/);
+  assert.match(e["node-inspector-note"].textContent,/4 table rows/);
+  assert.match(e["node-inspector-note"].textContent,/table samples, not answer provenance/);
+  assert.match(e["node-records"].textContent,/CA/);
+  assert.match(e["actual-answer"].textContent,/Waterloo/,"Table samples must not replace scored answers");
+});
+
+test("late table previews cannot reopen a closed inspector or replace a newer scenario",async () => {
+  for(const action of ["close","scenario"]){
+    const fixture=branchFixture(),ui=await lab({scenarios:[fixture.source,scenario("other")]}),e=ui.elements;await ui.finish(fixture.response);
+    graphNodes(e.graph)[0].fire("click");
+    if(action==="close")e["close-inspector"].fire("click");
+    else {e.scenario.value="other";e.scenario.fire("change");await ui.respond(3,result("NEW SCENARIO"));}
+    await ui.respond(2,{columns:["unsafe"],rows:[[{type:"string",value:"STALE PREVIEW"}]],row_count:1,preview_limit:8});
+    assert.equal(e["node-inspector"].hidden,true);
+    assert.doesNotMatch(e["node-records"].textContent,/STALE PREVIEW/);
+    if(action==="scenario")assert.match(e["actual-answer"].textContent,/NEW SCENARIO/);
+  }
+});
+
+test("duplicate result rows retain their multiplicity instead of being visually discarded",async () => {
+  const ui=await lab(),response=result("Same title");
+  response.run.rows.push(clone(response.run.rows[0]));response.expected_rows=clone(response.run.rows);
+  await ui.finish(response);
+  assert.match(ui.elements["actual-answer"].textContent,/×2/);
+  assert.match(ui.elements["actual-answer"].textContent,/2 rows · 1 distinct displayed values/);
+  assert.match(ui.elements["answer-summary"].textContent,/2 rows/);
+});
+
+test("optional NatSQL measurements form a real third card and bar, with unknown usage preserved",async () => {
+  const data={attempts:36,correct:36,input_tokens:55000,output_tokens:999,total_tokens:55999};
+  const ui=await lab({experiments:{groups:[group("three",{natsql:data})]}}),e=ui.elements;
+  const cards=nodesWithClass(e.experiments,"measurement-card");assert.equal(cards.length,3);
+  assert.match(cards[2].textContent,/NatSQL/);assert.match(cards[2].textContent,/55,999/);
+  const chart=descendants(e.experiments).find(item=>item.tagName==="svg");assert.match(chart.attributes["aria-label"],/NatSQL 55999/);
+  const unknown=await lab({experiments:{groups:[group("unknown-nat",{natsql:{attempts:36,correct:36}})]}});
+  const card=nodesWithClass(unknown.elements.experiments,"measurement-card")[2];
+  assert.equal(nodesWithClass(card,"measurement-total")[0].textContent,"Unknown");
+  assert.doesNotMatch(descendants(unknown.elements.experiments).find(item=>item.tagName==="svg").attributes["aria-label"],/NatSQL 0/);
+});
+
+test("clicking a measured crossover point selects only its recorded cohort during an edited-query request",async () => {
+  const first=group("single",{protocol:"JSON batch generation"}),second=group("batch",{protocol:"JSON batch generation",batch_size:12,
+    sql:{attempts:36,correct:36,input_tokens:8000,output_tokens:2000,total_tokens:10000},
+    sqlp:{attempts:36,correct:36,input_tokens:6000,output_tokens:2000,total_tokens:8000}});
+  const ui=await lab({experiments:{groups:[first,second]}}),e=ui.elements;await ui.finish();
+  ui.edit("SELECT a.name FROM AUTHOR a;");e.run.fire("click");
+  const calls=ui.calls.length,answer=e["actual-answer"].textContent,state=e["run-state"].textContent;
+  const point=descendants(e["cohort-chart"]).find(item=>item.attributes["data-group-id"]==="batch");assert.ok(point);point.fire("click");
+  assert.equal(e["experiment-select"].value,"batch");assert.match(e.experiments.textContent,/-20\.00%/);
+  assert.equal(ui.calls.length,calls);assert.equal(e["actual-answer"].textContent,answer);assert.equal(e["run-state"].textContent,state);assert.equal(e.run.disabled,true);
+});
+
+test("crossover lines do not mix response protocols or guide revisions",async () => {
+  for(const variant of ["protocol","guide_revision"]){
+    const first=group("single",{protocol:"JSON batch generation",guide_revision:"v1"});
+    const second=group("other",{protocol:variant==="protocol"?"Native generation":"JSON batch generation",guide_revision:variant==="guide_revision"?"v2":"v1",batch_size:12});
+    const ui=await lab({experiments:{groups:[first,second]}});
+    assert.equal(ui.elements["cohort-chart"].hidden,true,"Unmatched contexts cannot be connected as a batching experiment");
+  }
 });

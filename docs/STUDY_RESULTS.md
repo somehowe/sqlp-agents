@@ -1,94 +1,127 @@
 # Exploratory study results
 
-November 6, 2026. The completed study has **2,196 real model calls**, producing
-**2,556 scored query attempts** in 81 reports. It uses 12 Chinook development
-questions and 32 related synthetic templates: eight families at depths 1, 2, 4,
-and 6. There are three repetitions per model/condition. Repetitions, depth
-variants, catalog variants, and alternate snapshots are correlated observations.
-Human interpretation review is pending; the 30 reserved questions remain unrun.
+Updated November 6, 2026. Three models from one provider answer twelve Chinook
+development questions and 32 related constructed templates. The templates are
+eight families at depths 1, 2, 4, and 6. Repetitions, depth/catalog variants, and alternate
+snapshots are correlated observations. Human interpretation review is pending;
+the thirty reserved questions remain unrun.
 
-The models were `gpt-6.1-sol`, `gpt-6-luna`, and `gpt-6-astra`, all from the same
-provider. Every condition used high reasoning effort, an 8,192 output-token cap,
-and one stateless attempt with no repairs. Both languages received equivalent
-schema and relationship facts, with a guide for the corresponding language.
-All attempts, failures, and reported input/output tokens remain included.
+## Corrected SQL / SQLP / NatSQL comparison
+
+Our first NatSQL guide incorrectly omitted native flat column-IN-column syntax.
+Its 108 calls remain archived as **superseded calibration**. Their earlier 33/36
+matches per model are not a fair basis for claiming SQLP superiority.
+
+A fresh **324-call** comparison freezes corrected guides with two corresponding,
+unrelated examples, equivalent schema/relationship facts, high reasoning,
+an 8,192-output-token cap, and one stateless attempt with no repairs. Every model
+answers the same twelve questions three times in each language:
+
+| Model | SQL matches | SQLP matches | NatSQL matches | Total tokens: SQL / SQLP / NatSQL |
+| --- | ---: | ---: | ---: | ---: |
+| Sol | 36/36 | 36/36 | 36/36 | 64,864 / 65,069 / 71,160 |
+| Luna | 35/36 | 36/36 | 33/36 | 66,256 / 66,609 / 77,997 |
+| Astra | 36/36 | 36/36 | 36/36 | 64,638 / 64,847 / 70,750 |
+
+All 108 NatSQL outputs converted. Luna's three remaining failures are execution
+timeouts on one repeated task: it generated separate membership blocks and
+cross joins. Re-execution with 30 seconds still timed out. Original V1.6
+reconstruction of the same 108 saved queries gives identical correctness to
+V1.6.1, without new model calls. SQL's retained Luna mismatch uses a wrong
+media-type literal. These few errors do not establish a general language ranking.
+
+SQLP uses 0.32–0.53% more total tokens than SQL here. The fixed guides contribute
+30 extra input tokens/call for SQLP over SQL, and 138 for NatSQL over SQLP. Those
+instruction costs are included, but are not intrinsic constants of the languages.
+This compares complete interfaces/guides, not syntax in isolation.
+
+A separate **post-hoc guide-sensitivity run** adds a generic explanation that
+flat IN starts a membership subquery rather than replacing every foreign-key
+join. It changes only NatSQL's guide, retaining both unrelated examples and the
+same facts, models, questions, repetitions, and budgets. Its 108 fresh calls stay
+separate from the 324-call comparison; no best-guide result replaces prior data.
+
+With that clarification, Sol/Luna/Astra match **36/36, 35/36, 36/36**, with total
+NatSQL usage **73,134 / 81,105 / 73,052 tokens**. All 108 queries convert; one Luna
+execution still times out. The guide adds 72 input tokens/call. Luna improves
+from 33/36 to 35/36 while total usage increases. This shows guide sensitivity,
+not a confirmed language ranking or a reason to discard the earlier result.
 
 ## Sharing context changes the token tradeoff
 
-The table gives **SQLP's percentage change in total tokens relative to SQL**.
-Negative numbers mean fewer SQLP tokens. The native protocol returns raw query
-text. JSON batches return arrays of queries; **JSON batch size 1 is the format
-control**, so batching is not confused with a response-format change.
+The original fixed-guide JSON experiment uses matched batch sizes 1, 4, and 12. Size 1
+controls response format before changing how many questions share one request.
+The table is SQLP's percentage change in pooled provider input-plus-output tokens
+relative to SQL; negative means fewer SQLP tokens.
 
-| Model | Native one-question | JSON batch 1 | JSON batch 4 | JSON batch 12 |
-|---|---:|---:|---:|---:|
-| Sol | +1.87% | +0.62% | −2.17% | −10.71% |
-| Luna | +1.65% | +1.76% | −1.19% | −3.12% |
-| Astra | +1.20% | +0.88% | −2.74% | −8.26% |
+| Model | JSON batch 1 | JSON batch 4 | JSON batch 12 |
+| --- | ---: | ---: | ---: |
+| Sol | +0.62% | −2.17% | −10.71% |
+| Luna | +1.76% | −1.19% | −3.12% |
+| Astra | +0.88% | −2.74% | −8.26% |
 
-For batch size 12, the SQL/SQLP totals were 9,167/8,185 tokens for Sol,
-10,420/10,095 for Luna, and 9,033/8,287 for Astra. Each language matched all
-36 expected answers per model, across the three repetitions of 12 questions.
-Whole-batch usage is charged **once per response**; per-question reasoning usage
-is not invented. See [the batch protocol](BATCH_PILOT.md).
+Each language matches 36/36 answers per model at every batch size. Whole-response
+usage is counted once; per-question reasoning is not invented. Larger batches
+also have less output budget per question under the fixed request cap. These
+results use the original guides; do not splice corrected native-guide totals
+into this curve. See [the batch protocol](BATCH_PILOT.md).
 
-Shorter generated source alone did not establish lower total usage. In the
-native one-question runs, all SQL attempts matched the oracle; SQLP matched
-36/36 for Sol and Astra and 35/36 for Luna. Luna's mismatch used the wrong
-media-type string and returned an empty result. The [first pilot](PILOT_RESULTS.md)
-retains its original observations; the broader study adds the workflow controls.
+## Other controls
 
-## Other controls and failures
+**Longer paths and wider catalogs:** the narrow constructed catalog has two
+tables; the wide variant adds 16 unused tables without changing core data or
+answers. SQLP uses more total tokens at tested depths 1 and 2 and fewer at 4 and 6.
+Depth 6 reductions are 5.17–5.90% narrow and 2.05–3.08% wide. Depth also changes
+English length and graph composition, so this is not a depth-only causal result.
+Sol/Astra match 96/96 per language/catalog; narrow Luna matches 92/96 SQL and 95/96
+SQLP, and wide Luna 96/96 each. Every failure remains included.
 
-**NatSQL:** each model matched 33/36 expected answers. The same six-table
-question was rejected by the converter in all nine attempts. This uses the pinned official
-converter with a reviewed structural adapter, which omits upstream linguistic
-preprocessing. It is not a reproduction of the full NatSQL system or evidence
-that another encoding could never work. See [the NatSQL condition](NATSQL.md).
+**Join views:** both languages receive the same nine generated views and base
+facts. Optional root-view use is 25/108 SQL and 2/108 SQLP. A post-hoc follow-up
+requires view roots: 108/108 per language use them and match, with 0.74–0.97% more
+SQLP tokens. This tests fixed-depth full-catalog exposure, not optimized view
+selection. See [view construction](JOIN_VIEWS.md).
 
-**Longer paths and wider catalogs:** the synthetic narrow catalog has two
-tables; the wider variant adds 16 unused tables while preserving core data,
-questions, and answers. Sol and Astra matched 96/96 answers per language in
-both catalogs. In the narrow catalog, Luna matched 92/96 SQL and 95/96 SQLP;
-in the wider catalog both matched 96/96. The narrow failures included SQL alias
-and path-depth mistakes and one SQLP role-name case error. These small,
-constructed results do not establish a general correctness advantage.
+**Alternate data:** unchanged saved path queries retain their original outcome
+on two other valid graphs without model calls. A separate album-title contrast
+exposes two original-data matches that incorrectly remove duplicate titles.
+A match on one dataset is weaker than equivalence. [Snapshot rescoring](SNAPSHOT_EVALUATION.md)
+is diagnostic, not a proof.
 
-**Join views:** both languages received the same nine generated views and base
-facts. Optional adoption was low: SQL used a view root in 25/108 attempts and
-SQLP in 2/108. A post-hoc follow-up required a view root: all 108 attempts per
-language used one and matched their answers. SQLP still used 0.74–0.97% more
-total tokens. This fixed-depth, full-catalog control is not optimized view
-selection, and does not show that optimized view interfaces are inferior.
-See [how the views are constructed](JOIN_VIEWS.md).
+**Official NatSQL validation:** 6,204 offline reconstructions cover all 1,034
+public Spider gold examples across version/grammar controls. The README driver
+combination gives 970/1,034 execution matches for NatSQL and 1,003/1,034 for
+NatSQL_G on real official databases with published preprocessed schema. This
+validates reconstruction, not the original trained system or exact published
+percentages. See [the reproduction scope](NATSQL.md).
 
-**Contrasting data:** saved path queries were re-executed on two other valid
-snapshots without new model calls. Their observed success/failure counts stayed
-the same. A separate album-title counterexample exposed two original-data
-matches that incorrectly removed duplicate titles. A match on one snapshot
-does not prove query equivalence; [snapshot rescoring](SNAPSHOT_EVALUATION.md)
-is a diagnostic backed by supplied expected row bags.
+## Accounting and interpretation
 
-## What the evidence supports
+The historical archive now contains **2,628 experimental API calls**, **2,988
+generated/scored outputs**, and 108 reports, including the 108 superseded NatSQL
+calibration calls. Offline gold reconstructions, alternate-data executions, and
+manual browser edits add no model calls. The 432 newer calls comprise the 324-call
+corrected comparison plus 108 guide-sensitivity calls; their totals stay separate.
 
-The useful result is a **workflow-dependent tradeoff**: compact path queries
-can save total tokens when shared context amortizes their instructions. This
-study does not establish state-of-the-art performance, cross-provider results,
-statistical significance, human productivity gains, or general SQLP superiority.
-The tested system includes its compiler/checker, not syntax in isolation.
-The templates and reference answers were constructed for development. Synthetic
-reference queries and record-walk answers share authored path plans; they have
-not received independent human semantic review.
+The original SQL/SQLP matrix contains 1,872 calls/2,232 outputs after excluding the
+108 superseded NatSQL calls; the required-view follow-up adds 216/216. The newer
+three-language comparison and guide sensitivity have separate frozen records.
+Provider totals include prompts, guides, schema, output, reported reasoning,
+and failures; overlapping usage fields are not counted twice.
 
-The local archive is `resources/experiments/demo-study-2026-11-06/`.
-`study-summary.json` and its read-only analysis script validate frozen data,
-requests, journals, raw usage, answers, and all 81 completed reports. The first
-1,980 calls cover the initial matrix; the required-view follow-up adds 216.
-Raw experiments, the working paper, and video remain local and Git-ignored.
-No credentials are included in public documentation or the default demo bundle.
+Local archives: `resources/experiments/demo-study-2026-11-06/`,
+`natsql-corrected-2026-11-06/`, and `natsql-guide-sensitivity-2026-11-06/` under
+the same experiments directory. Their validators bind exact plans, responses,
+journals, usage, data, and expected bags. Original artifacts are never rewritten
+to make a later correction look like an earlier success.
 
-Try the [interactive lab](DEMO_LAB.md) to edit paths, inspect joins, and switch
-snapshots. Its default examples are prepared and make no model calls. Saved
-model records and manual interventions are labeled separately. The current
-bounded exploratory demo can be reviewed on this evidence; a future reserved
-study needs human answer review and a protocol freeze before any calls.
+The useful observation is that **the workflow and language guide affect total usage**.
+It does not establish general accuracy superiority, statistical significance,
+cross-provider results, human productivity gains, or storage-engine savings.
+Reference queries and record-walk answers share authored interpretations; their
+execution checks do not replace independent human semantic review.
+
+Try [Path Studio](DEMO_LAB.md) to inspect the compiler's actual joins, real table
+samples, duplicate-sensitive answers, and separately recorded costs. The default
+starter bundle is prepared, with no model calls or invented usage. Paper, video,
+raw reports, and credentials remain outside public Git.

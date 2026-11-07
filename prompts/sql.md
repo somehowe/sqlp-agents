@@ -47,3 +47,15 @@ FROM EMPLOYEE AS e
 INNER JOIN DEPARTMENT AS d ON e.department_id = d.did
 WHERE d.region = 'West' AND e.eid = 7;
 ```
+
+## Existence and distinct names
+
+Using the same unrelated example schema, list department names with at least
+one employee named Ada. Return each name once.
+
+```sql
+SELECT DISTINCT d.name
+FROM EMPLOYEE AS e
+INNER JOIN DEPARTMENT AS d ON e.department_id = d.did
+WHERE e.name = 'Ada';
+```

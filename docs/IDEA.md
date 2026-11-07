@@ -1,12 +1,11 @@
 # SQLP for AI Agents: Correctness and Token Efficiency
 
-We are studying whether SQLP makes it easier for models to write database
-queries correctly and with fewer total tokens. SQLP lets a query name the
-relationships it follows. Our C++ compiler turns those paths into SQL, and
-**SQLite executes both SQL and SQLP conditions**.
+We are studying whether SQLP helps models write database queries correctly and
+with fewer total tokens. SQLP names the relationships a query follows. Our C++
+compiler turns those paths into SQL, and **SQLite executes both conditions**.
 
 **Research question:** Given equivalent schema and relationship information,
-how does using SQLP instead of SQL affect query correctness and total token usage?
+how does using SQLP instead of SQL affect correctness and total token usage?
 
 ## A small example
 
@@ -16,60 +15,53 @@ FROM WROTE AS w
 WHERE w.author.university.country = 'DK';
 ```
 
-The compiler follows the approved author and university mappings, creates the
-joins, and binds `DK` as a parameter. In the SQL condition, the model writes
-those joins itself. Both conditions receive the same relationship facts.
-The model still chooses the path: an author's university country and a paper's
-publisher country can mean different things.
+The compiler follows approved author and university mappings, creates their
+joins, and binds `DK` as a parameter. In ordinary SQL, the model writes those
+joins using the same relationship facts. It still has to choose the right path:
+an author's university country and a paper's publisher country can differ.
 
 ## What we have now
 
-The compiler, Python experiment runners, interactive lab, and saved-record
-viewer work. The compiler handles a tested subset: one root table, finite
-multi-hop paths, projections, literal equality, AND, and DISTINCT. A restricted
-ARM mapping layer can expose logical views over approved physical tables.
-We are not building a new storage engine or automatically discovering links.
+The compiler, experiment runners, saved-record viewer, and **SQLP Path Studio**
+work. The compiler supports one root table, finite multi-hop paths, projections,
+literal equality, AND, and DISTINCT. A restricted ARM layer can expose logical
+views over approved physical tables. We receive the relationships; automatic
+data-lake discovery and a new storage engine remain separate extensions.
 
-The [study](STUDY_RESULTS.md) contains 2,196 model calls across three models,
-using 12 Chinook questions and 32 related synthetic path templates. These are
-exploratory observations, not thousands of independent research tasks.
+The [results](STUDY_RESULTS.md) cover three models, twelve Chinook questions,
+and 32 related synthetic templates. The workflow matters: separate requests
+used slightly more SQLP tokens, while shared-context batches and longer tested
+paths could save tokens. We have not established general accuracy superiority.
 
-The interesting finding is that the workflow matters. Asking questions one
-at a time made SQLP's longer guide outweigh its shorter queries. Sharing the
-same guide and schema across twelve questions reduced total usage by
-3.12–10.71% relative to SQL in these runs. We also tested a JSON one-question
-control, NatSQL, wider schemas, and shared generated join views. The results
-include the cases where SQLP did not help.
+We also fixed a mistake in our first NatSQL guide: it omitted native flat `IN`.
+Fresh comparisons now exercise that syntax, and the official converter has
+been checked against all 1,034 public Spider gold examples. The original failed
+guide remains in the archive, separate from the corrected comparison.
 
 ## What someone can do in the demo
 
-Open the [query lab](DEMO_LAB.md), choose a scenario, and edit a SQLP path.
-Choose **Run** to compile and execute the edited query, inspect its joins, and
-compare its answer with the supplied expected rows. Typing alone does not run
-the edit. Switching snapshots executes the current query on the selected data,
-so visitors can see whether its answer still matches. SQL can be edited
-through the same scorer. These edits are manual and make no model calls.
+Open [Path Studio](DEMO_LAB.md), choose a scenario, edit a path, and click **Run**.
+The graph shows every branch and keeps different aliases of the same table
+separate. Click a path to highlight its SQL joins, or use **Follow path** to step
+through its roles. The animation explains compilation; it is not measured query
+execution. Click a table to inspect real sample records, or explore the supplied
+relationships in **Catalog map**.
 
-The public starter bundle contains prepared examples with no invented usage.
-Recorded model results can be loaded separately. A query can match one dataset
-and still miss its intended meaning, for example by merging different albums
-that share a title. Snapshot checks help expose this; they do not prove general
-query equivalence.
+The answer panel preserves duplicates. Switching snapshots can expose an
+unwanted DISTINCT, even when a query matched the first dataset. Recorded token
+charts stay separate from these manual edits. The public starter bundle uses
+prepared examples; recorded bundles can add SQL/SQLP/NatSQL measurements.
+Nothing here calls a model, and typing a new English question does not launch
+an agent. Table samples show data, not proof of which rows produced an answer.
 
-## What we still need to do
+## What comes next
 
-We have a working four-page demo-paper draft and a short captioned video locally.
-The next priority is mentor feedback, checking question meanings and expected
-answers, and rehearsing the actual audience walkthrough. Human interpretation
-review is still pending. The 30 reserved questions have received no model calls.
-A bounded exploratory demo can report the current evidence honestly; adding a
-reserved study requires review and a freeze before its first calls.
+Review the question meanings, expected answers, claims, and actual walkthrough
+with Enamul. The paper and captioned video remain local working artifacts.
+Human interpretation review is still pending; the thirty reserved questions
+have received no model calls. A reserved follow-up needs review and a protocol
+freeze before its first calls.
 
-Ryan currently handles the required implementation and delivery. Sam is planning
-a separate paper, and Iris has discussed a data-lake extension. Help with review
-or the demonstration can fit alongside those directions, with tasks agreed
-rather than assumed. These old coding roles do not decide authorship.
-
-Data-lake discovery is a possible extension. The current study receives approved
-relationships and uses a sample-store database plus constructed records. We
-should describe that setting precisely instead of calling it a complete data lake.
+Ryan handles required delivery. Sam is planning a separate paper, and Iris has
+discussed a data-lake extension. Additional review or demo work should be agreed
+rather than assumed; these old roles do not settle authorship.

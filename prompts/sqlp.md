@@ -49,3 +49,14 @@ SELECT e.name, e.department.name
 FROM EMPLOYEE AS e
 WHERE e.department.region = 'West' AND e.eid = 7;
 ```
+
+## Existence and distinct names
+
+Using the same unrelated example schema, list department names with at least
+one employee named Ada. Return each name once.
+
+```sql
+SELECT DISTINCT e.department.name
+FROM EMPLOYEE AS e
+WHERE e.name = 'Ada';
+```

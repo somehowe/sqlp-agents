@@ -11,12 +11,12 @@ parameters; **SQLite executes both conditions**.
 does using SQLP instead of SQL affect AI agents' query correctness and total token
 usage?
 
-The [exploratory study](docs/STUDY_RESULTS.md) now contains 2,196 model calls
-across three models. SQLP's total-token tradeoff changed with the workflow:
-independent questions cost more, while shared-context batches used fewer tokens
-on these tasks. The interactive lab lets visitors edit paths and inspect the
-resulting joins and answers. Human interpretation review remains pending;
-the 30 reserved questions have not received model calls.
+**SQLP Path Studio** makes the language visible: follow a named path through a
+branching graph, inspect its exact SQL joins, open real table samples, and see
+how editing a relationship changes the answer. It runs locally without model
+calls. The [exploratory results](docs/STUDY_RESULTS.md) include corrected NatSQL
+comparisons, shared-context batches, longer paths, and join-view controls.
+Human interpretation review is pending; the 30 reserved questions remain unrun.
 
 ## Quick start
 
@@ -37,9 +37,10 @@ python3 -m tools.demo_server --bundle build/lab-demo/bundle.json \
 ```
 
 Open `http://127.0.0.1:8765/`. Choose a scenario, edit a SQLP path, and click
-**Run** to compile and execute it. Inspect its joins, then switch snapshots to
-check the same query on contrasting data. SQL can use the same read-only scorer.
-Stop the server with Ctrl+C.
+**Run**. Select a path to highlight its joins, use **Follow path** to step through
+its roles, and click a table for real sample records. Switch to **Catalog map**
+to explore supplied relationships or change snapshots to expose answer mistakes.
+SQL uses the same read-only scorer. Stop the server with Ctrl+C.
 
 This default bundle contains **prepared synthetic examples**, including a
 deliberate duplicate-handling mistake. It makes no model calls and invents no
@@ -107,7 +108,7 @@ UNION, and multiple FROM bindings are outside the current profile. See
 ## What is built
 
 | Component | Current behavior |
-|---|---|
+| --- | --- |
 | [C++ frontend](docs/COMPILER_CLI.md) | Tokenizer, Bison parser, query AST, name/type checks, path compilation, parameterized SQL, and translation traces |
 | [Dataset tools](docs/DATASET_CHECKS.md) | Inspect SQLite schemas and validate actual types, keys, and total references |
 | [Restricted ARM layer](docs/ARM_MAPPING.md) | Validate reviewed single-key mappings and create logical SQLite views/catalog; inspired by the Abstract Relational Model (ARM) |
@@ -117,7 +118,7 @@ UNION, and multiple FROM bindings are outside the current profile. See
 | [Study tools](docs/EXPERIMENT_KIT.md) | Freeze inputs/runtime, export [review packets](docs/REVIEW_PACKET.md), analyze paired records, and measure prepared-query sizes/timings |
 | [Contrasting data](docs/SNAPSHOT_EVALUATION.md) | Re-execute saved queries on supplied alternate snapshots; expose accidental agreement without new model calls |
 | [Join-view control](docs/JOIN_VIEWS.md) | Generate workload-independent flattened views and expose the same facts to both languages |
-| [Interactive lab](docs/DEMO_LAB.md) | Edit and execute queries locally, inspect paths and joins, and switch snapshots; no model calls |
+| [Path Studio](docs/DEMO_LAB.md) | Branching role/alias graph, join highlighting, animated path steps, catalog map, real table previews, duplicate-sensitive answers, and recorded token charts; no model calls |
 | [Browser viewer](docs/VIEWER.md) | Display saved queries, answers, diagnostics, tokens, path mappings, and optional ARM mapping artifacts using plain HTML/CSS/JavaScript |
 
 The public sample workload uses a pinned **Chinook sample-store database**: nine
@@ -143,14 +144,18 @@ runner uses one attempt per condition. It checks expected values and duplicate
 counts and records all provider-reported input/output tokens, including guides
 and schema. Missing usage stays unknown. A repair loop is not implemented.
 
-Across the three models, SQLP used 1.20–1.87% more total tokens in the native
-one-question protocol. With twelve questions sharing context, it used
-3.12–10.71% fewer, with every answer matching the supplied oracle. Batch-size-1
-JSON controls separate batching from output-format changes. These are bounded,
-exploratory observations; repeated templates and snapshots are correlated.
-The [full results](docs/STUDY_RESULTS.md) retain negative and mixed controls.
-Static [offline microbenchmarks](docs/OFFLINE_BENCHMARKS.md) remain separate.
-See [credential setup](docs/CREDENTIALS.md) before configuring a live run.
+The corrected three-language comparison uses two corresponding examples per
+guide. SQLP used 0.32–0.53% more total tokens than SQL on separate requests;
+NatSQL converted all 108 outputs, with 36/36 answer matches for Sol/Astra and
+33/36 for Luna. The earlier guide incorrectly omitted native flat `IN` and its
+108 calls are preserved as superseded calibration, not evidence of superiority.
+
+In the original fixed-guide JSON batches, twelve questions sharing context used
+3.12–10.71% fewer SQLP tokens, with all answers matching in both languages.
+Guide versions and protocols stay separate. These bounded observations do not
+establish general accuracy gains or an intrinsic language-token advantage.
+See [the full results](docs/STUDY_RESULTS.md), [NatSQL details](docs/NATSQL.md),
+and [credential setup](docs/CREDENTIALS.md) before any live run.
 
 ## Build and checks
 
@@ -159,11 +164,11 @@ make -j2 all test
 make test-viewer
 ```
 
-The first command builds both executables and runs the C++ suites, 354 Python
+The first command builds both executables and runs the C++ suites, 360 Python
 tests, and 1,200 differential compiler cases. Optional integrations skip when
-their separate inputs are absent. The second runs 50 Node checks across the
+their separate inputs are absent. The second runs 61 Node checks across the
 saved viewer and interactive lab, without packages. A Chromium walkthrough
-also passed 14 browser checks; conference rehearsal still needs human review.
+also passed 26 browser-check categories; conference rehearsal still needs human review.
 GitHub Actions runs the offline suites and exercises the viewer with generated
 prepared, deliberate-error, and replay reports.
 
@@ -189,7 +194,7 @@ Git-ignored `build/` and `resources/` directories.
 ## Related work
 
 | Paper | Connection |
-|---|---|
+| --- | --- |
 | [The Utility of the Abstract Relational Model and Attribute Paths in SQL](https://pubs.cs.uct.ac.za/id/eprint/1276/1/ersqlpathEKAW18.pdf) | SQLP/ARM foundations and human query-authoring/comprehension studies |
 | [NatSQL: Natural SQL](https://aclanthology.org/2021.findings-emnlp.174/) | A simplified intermediate representation for text-to-SQL generation |
 | [Qualitative Join Discovery in Data Lakes using Examples](https://mirmahathir.com/papers/semdisc.pdf) | SemDisc join discovery; context for a possible future data-lake extension |

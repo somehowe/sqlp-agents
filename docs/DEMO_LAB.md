@@ -1,19 +1,24 @@
-# Interactive query lab
+# SQLP Path Studio
 
-The lab lets a visitor edit a SQLP path, choose **Run** to compile and execute it,
-inspect the generated joins, and switch between registered data snapshots.
-An answer is compared with that snapshot's supplied expected row bag, including
-duplicates. SQL can be edited and executed through the same read-only scorer.
-**Every intervention is manual; this server makes zero model calls.** Recorded
-model usage is displayed separately and is never charged to a local edit.
+Path Studio lets a visitor edit SQLP, run the actual C++ compiler and SQLite,
+and see how named relationships become joins. The graph shows all query
+branches simultaneously, including separate aliases when different roles reach
+the same table. Select a path to highlight its physical SQL joins; step through
+it or press **Follow path**. The animation explains the compiler trace, not
+execution timing or row provenance.
 
-This complements the [saved-record viewer](VIEWER.md). It is a local workbench,
-not automatic relationship discovery, a proof of SQL equivalence, or an
-interactive system for choosing the user's intended meaning.
+Click a node for real records from its frozen table, or use **Catalog map** to
+inspect supplied relationships. Pan, zoom, and Fit make longer paths readable.
+Answer tables group identical displayed rows with multiplicity badges while
+scoring every duplicate. Snapshot changes can reveal an accidental match.
+
+**All interventions are manual; the server makes zero model calls.** Recorded
+SQL/SQLP measurements, optional NatSQL cards, input/output bars, and JSON-batch
+curves stay separate from local edits. The batch curve connects only compatible
+JSON cohorts; native requests or different guide revisions are not spliced in.
+NatSQL is a recorded condition, not an editable execution language here.
 
 ## Run
-
-Build the compiler and create the public prepared-example bundle:
 
 ```bash
 make
@@ -22,112 +27,94 @@ python3 -m tools.demo_server --bundle build/lab-demo/bundle.json \
   --compiler build/lab-demo/sqlpc --port 8765
 ```
 
-Open `http://127.0.0.1:8765/`. The server always binds to loopback; there is no
-option for a public interface. An optional `--compiler` selects another trusted
-compiler binary. Stop with Ctrl+C. No API key or third-party package is needed.
+Open `http://127.0.0.1:8765/`. Stop with Ctrl+C. No API key, third-party Python
+package, JavaScript build, or external CDN is needed. Use a new output folder.
+The default bundle contains eleven **prepared synthetic scenarios**, including
+a deliberately introduced DISTINCT mistake, and no invented provider usage.
+Recorded bundles can be supplied separately; their claims remain labeled.
 
-The output folder must be new. This default bundle contains 11 prepared
-synthetic scenarios, including a deliberately introduced `DISTINCT` mistake.
-It includes no recorded model experiment and shows unknown model usage.
-Recorded bundles can be supplied separately with `--bundle`; their saved model
-usage remains distinct from new manual executions. See [the recorded study](STUDY_RESULTS.md).
+The server validates actual schema/types/keys/references, then privately freezes
+registered databases and the compiler. Later edits to the originals do not
+change the session. Starting a session does not certify human answer review.
 
-The launch process validates actual schema/types/keys/references, makes private
-copies of the registered SQLite snapshots and compiler, then serves the lab.
-Later edits to the original database do not change the session. Snapshot and
-compiler hashes are returned with each execution. Expected answers and model
-records remain supplied evidence; startup checks do not certify human review.
+## Walkthrough
+
+1. Run the author-affiliation/publisher scenario. Both university instances stay
+   visible with distinct aliases. Select each path and follow its highlighted joins.
+2. Click a table to inspect up to eight real sample records. These are table
+   samples with unspecified order, not rows traced from the current answer.
+3. Change the publisher-country path to the author-affiliation path and **Run**.
+   Observe changed joins, alias reuse, and answers. Typing alone leaves edits unrun.
+4. Choose the duplicate-sensitive scene and switch its data snapshot. An extra
+   valid row can expose unwanted DISTINCT. A match is not an equivalence proof.
+5. With a recorded bundle, inspect language totals or click a batch-curve point.
+   Preset changes do not rerun models or assign usage to the current edited query.
+
+Ctrl/Cmd+Enter runs an edit. Late responses cannot replace newer edits; SQL, paths, and answers identify the last completed scenario/snapshot. Table
+samples show their own scenario/snapshot context.
+SQL is editable through the same read-only answer scorer.
 
 ## Bundle contract
 
-The UTF-8 JSON file has version 1 and at most 100 scenarios. Database paths must
-be absolute, are supplied only by the owner at launch, and never come from the
-browser. Use approved data only: the shared SQL scorer permits reads throughout
-the selected database, so do not put private or gold-answer tables in it.
+The UTF-8 JSON bundle has version 1 and at most 100 scenarios. Every scenario has
+`id`, `question`, `column_count`, `catalog`, starting `sql`/`sqlp`, and `snapshots`.
+There is one `original` snapshot and up to three contrasts. Each snapshot supplies
+an absolute owner-registered `database` path and raw-scalar `expected_rows`.
+The browser never selects filesystem paths. See the generated bundle for a
+complete example and [the catalog contract](DATASET_CHECKS.md) for metadata.
+
+Optional `saved` carries a clear origin/model label and per-language recorded
+runs with `token_usage`. Optional `experiments.groups` carries cohort metadata
+(`id`, `model`, `dataset`, `protocol`, `guide_revision`, `batch_size`,
+`question_count`, `repetitions`) and `sql`/`sqlp`, plus optional `natsql`, records.
+Each record supplies `attempts`, `correct`, `input_tokens`, `output_tokens`, and
+`total_tokens`. Unknown usage remains unknown. Usage belongs to a whole model
+response; per-question batch displays are labeled amortized means.
+
+Use approved snapshots only. The SQL scorer can read throughout the selected
+database, so do not put private or expected-answer tables in it. This is a local
+workbench, not automatic discovery or a user-intent inference system.
+
+## Requests and limits
+
+Only the lab assets and `/api/scenarios`, `/api/run`, `/api/preview` are served.
+Database files, credentials, and arbitrary paths are not static routes. Hosts
+must be loopback; Origin, when supplied, must match. Cross-site fetches, CORS
+preflights, writes, and attached databases are rejected.
+
+`POST /api/run` accepts exactly `scenario`, `language`, `query`, `snapshot`.
+The languages are `sql` and `sqlp`. Extra fields, unknown registrations,
+duplicate JSON keys, non-UTF-8/nonfinite JSON, or bodies over 32 KiB are rejected.
+Defaults: two seconds per query, 500 result rows, a 16 KiB SQLite row/value limit,
+a 4 MiB response limit, and four simultaneous operations. Errors/oversized results
+are never labeled matches; result previews show 20 rows but score all accepted rows.
+
+`POST /api/preview` accepts exactly three text fields:
 
 ```json
 {
-  "version": 1,
-  "title": "SQLP Query Lab",
-  "scenarios": [{
-    "id": "album-titles",
-    "question": "List album titles, once per album.",
-    "column_count": 1,
-    "catalog": {"version": 1, "tables": [], "references": []},
-    "sql": "SELECT a.Title FROM Album AS a;",
-    "sqlp": "SELECT a.Title FROM Album AS a;",
-    "snapshots": {
-      "original": {
-        "database": "/absolute/path/to/original.sqlite",
-        "label": "Original data",
-        "expected_rows": [["First album"], ["Second album"]]
-      },
-      "contrast1": {
-        "database": "/absolute/path/to/contrast.sqlite",
-        "label": "Two albums share a title",
-        "expected_rows": [["First album"], ["Second album"], ["First album"]]
-      }
-    }
-  }]
+  "scenario": "academic-canadian_authors_danish_publishers",
+  "snapshot": "original",
+  "table": "AUTHOR"
 }
 ```
 
-Replace the empty example catalog with a valid [version-1 catalog](DATASET_CHECKS.md).
-Every scenario needs `column_count`, raw JSON scalar `expected_rows`, and an
-`original` snapshot; up to three contrasts may be added. The starting queries
-may be recorded model output or prepared queries. They are re-executed on the
-selected snapshot for comparison with the edit.
+Only a table in that scenario's supplied catalog is allowed. The server quotes
+its registered identifiers and runs bounded, read-only SELECT/count statements
+against the frozen snapshot. No query text or file path is accepted. The response
+has typed cells, total `row_count`, at most **8 rows/16 columns**, `has_more`,
+`columns_truncated`, and `snapshot_sha256`. A table sample is not an answer check
+or provenance; order is unspecified. Preview timeouts/errors report unavailable
+rather than presenting a partial sample as complete.
 
-An optional scenario `saved` object can contain `label`, `model`, `origin`, and
-`sql`/`sqlp` run objects carrying `token_usage`. Label real records clearly, for
-example `"label": "Recorded Sol response; re-executed locally"`. Missing usage
-stays unknown. Optional top-level `experiments` accepts a table:
-
-```json
-{
-  "columns": ["Condition", "Questions", "Total tokens"],
-  "rows": [["SQL", 12, 20762], ["SQLP", 12, 21142]],
-  "note": "Exploratory recorded development batch; no new model calls here."
-}
-```
-
-## Audience walkthrough
-
-1. Choose a scenario, inspect its question, then run the starting SQLP query.
-2. Select a path occurrence. The diagram shows each named role and distinct
-   physical alias; the cards show the exact source-key/target-key equalities.
-3. Change a role in the query and run again (Ctrl/Cmd+Enter also works). Compare
-   the edited result, the starting query's result, and supplied snapshot answer.
-4. Switch to a contrast snapshot. For example, adding another album with the
-   same title can expose an unwanted `DISTINCT`. Passing one snapshot does not
-   establish correctness on every valid database.
-5. Inspect the separate recorded model experiment table. Source compactness,
-   provider total tokens, and manual edits are distinct measurements.
-
-## Local request boundary and limits
-
-Only `/`, `/lab.html`, `/lab.js`, `/lab.css`, `/api/scenarios`, and `/api/run`
-are served. Resources, credentials, database files, and arbitrary filesystem
-paths are not static routes. Browser metadata omits registered database paths.
-Requests require a loopback Host and matching Origin when present; cross-site
-fetches, CORS preflights, and writable SQLite operations are rejected.
-
-`POST /api/run` accepts exactly `scenario`, `language`, `query`, and `snapshot`.
-Unknown registrations, extra file-path fields, duplicate JSON keys, non-UTF-8
-JSON, and bodies over 32 KiB are rejected. Defaults are two seconds per query,
-500 result rows, a 16 KiB SQLite row/value limit, and a 4 MiB response limit.
-There are at most four simultaneous executions. A failed or oversized query is
-displayed as an error; a truncated answer is never labeled a match. Tables
-preview only 20 rows while all accepted rows participate in scoring.
-
-Regression checks:
+## Checks
 
 ```bash
 python3 tests/demo_server_test.py
-node --check web/lab.js
+make test-viewer
 ```
 
-The HTTP tests bind ephemeral loopback ports and use temporary fixture data
-without API credentials. `make test-viewer` runs the saved viewer's 23 Node
-checks and the lab's 27 checks. A Chromium walkthrough also passed 14 browser
-checks; final conference rehearsal and a human visual check remain useful.
+The HTTP tests use ephemeral loopback ports and temporary data. Node checks
+cover 23 saved-viewer and 38 Path Studio cases; actual Chromium checks cover the
+original 14 categories plus 12 visual-studio categories. Human conference rehearsal
+and review of question meanings still remain.
