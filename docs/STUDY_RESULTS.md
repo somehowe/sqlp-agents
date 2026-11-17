@@ -1,11 +1,128 @@
 # Exploratory study results
 
-Updated November 16, 2026. The new scale evaluation runs 2,034 distinct English
-questions with Luna; the earlier three-model studies below retain their original
+Updated November 17, 2026. The scale evaluation now includes the 1,000-question
+SQL/SQLP comparison across Luna, Sol, and Astra, plus a matched NatSQL follow-up.
+The broader public SQL challenge is complete for Luna/Sol and partial for Astra.
+The earlier studies below retain their original
 twelve Chinook development questions and 32 related constructed templates.
 Questions, shared templates, repeated outputs, and snapshots are counted
 separately. Human interpretation review remains pending; the thirty reserved
 Chinook questions remain unrun.
+
+## Three-model follow-up and matched NatSQL evaluation (November 17)
+
+The complete **1,000-question paired stress workload** has now run on all three
+models used previously. Sol and Astra use byte-identical frozen data, guides,
+compiler, scoring runtime, question groups, and settings from the initial Luna
+study; only the request's model identifier and its hash change. All conditions
+use high reasoning, batches of four, and a 16,384-output-token cap.
+
+| Model | SQL matches / 1,000 | SQLP matches / 1,000 | SQLP total-token change vs SQL |
+| --- | ---: | ---: | ---: |
+| Luna | 946 | 990 | -10.70% |
+| Sol | 999 | 1,000 | -7.11% |
+| Astra | 1,000 | 1,000 | -8.27% |
+
+These supported-condition usage totals remain exact: every original response
+was retained. SQL/SQLP totals are 946,742/845,484 tokens for Luna,
+884,554/821,636 for Sol, and 886,339/813,062 for Astra. The same 1,000 constructed
+questions recur across models; this is 3,000 paired question/model observations,
+not 3,000 independent questions. No repair feedback was given to a model.
+
+**NatSQL is now an actual model comparison on the expanded data**, rather than
+only the earlier twelve-question study. An outcome-independent structural filter
+selects 188 questions in 47 complete original batches, with no repeated physical
+table bindings. All three models generated NatSQL for every selected question:
+141 retained responses and 564 outputs. SQL/SQLP counterparts reuse those exact
+questions, public request bodies, batch groups, model settings, and data.
+
+| Model | SQL / 188 | SQLP / 188 | NatSQL / 188 | NatSQL on the 184 reference-compatible cases |
+| --- | ---: | ---: | ---: | ---: |
+| Luna | 188 | 188 | 171 | 171/184 |
+| Sol | 188 | 188 | 184 | 184/184 |
+| Astra | 188 | 188 | 183 | 183/184 |
+
+Four prepared NatSQL encodings return no SQL under the pinned converter's
+five-table network limit. They remain in the 188-target results and are flagged
+separately; they must not be presented as four model reasoning mistakes. The
+remaining misses are wrong inferred relationships or explicit encoding errors.
+The preflight validates reference encodings, not every possible NatSQL encoding:
+these failures do not prove general language unrepresentability. Reference
+coverage was fixed before the new NatSQL model calls.
+
+A further **176-question supplement**, selected as 44 complete original batches
+whose reference encodings pass, permits matched whole-batch token accounting.
+It contains mainly shallow paths. SQLP uses 1.14% fewer tokens than SQL for Luna,
+but **1.15% more for Sol and 0.31% more for Astra**. This mixed result remains
+reported alongside the longer-path 1,000-case result. Astra NatSQL uses 150,500
+tokens on this supplement, compared with 138,438 for SQL and 138,870 for SQLP.
+Luna/Sol NatSQL have known retained-response subtotals of 165,643/149,446 tokens,
+but exact whole-API totals are unknown because each includes an original lost
+transport attempt. Do not treat those subtotals as exact workflow-token totals.
+
+The original converter setup could not complete on the larger full catalogs.
+The new follow-up therefore declares an **indexed, cached, literal-preserving
+adapter profile**, separately from the earlier original profile. It retains the
+pinned upstream files and all table/column/key facts. An indexed duplicate
+predicate runs the official enlargement algorithm without discarding alternative
+join networks; control fixtures verify exact ordered network-list equality.
+Prepared schemas are query-independent, hash-bound caches loaded afresh for each
+query. Valid SQL string tokens are transported through the upstream tokenizer
+and restored with their original values, fixing apostrophe corruption without
+query repair or gold access. The original profile remains the default. See
+[the adapter details and limits](NATSQL.md).
+
+All 564 NatSQL outputs passed raw-response/query/converter/cache/literal binding
+checks. All 554 successfully converted queries were re-executed on primary and
+alternate data. NatSQL match counts remain 171/184/183 on the alternate data;
+no primary match becomes a mismatch. Reference preparation includes 376 checks,
+with four conversion rejections on each snapshot and one parallel timeout whose
+unchanged SQL passes a documented serial check in 0.002 seconds.
+
+The broader **1,034-question public SQL challenge** is complete for Luna
+(828/1,032 executable references) and Sol (862/1,032). Astra is currently partial:
+429 public outputs retained, 365 reference matches. This partial result must not
+be compared as though it covered the same full question set. Completing Astra's
+remaining 605 public questions awaits the budget-scope clarification requested
+from the user; the full 1,000-case paired and 188-case NatSQL comparisons above
+are already complete.
+
+Five original API sends lost their responses: one Sol public batch, two Astra
+public batches, and one NatSQL batch each for Luna and Sol. Each received one
+explicit, identical-payload transport recovery under a separate paid label,
+without query feedback. Original attempts, unknown usage, and their full
+**$18.783549** spending reserves remain recorded. Consequently the overall
+API-token total is unknown, even though retained-response subtotals and the
+unaffected paired-condition totals are known. This does not erase or relabel an
+uncertain first attempt as a successful first attempt.
+
+All financial corrections and recoveries preserve the original lifetime $100
+guard. Earlier conservative reservations were reconciled only against exact
+retained response and submitted-request hashes, with immutable backups and
+per-call audits. The user's reported external account balance is separate from this
+local guard; its scope has not been silently reset or increased.
+At the pause, its conservative held total is $91.925778, leaving $8.074222;
+the next request cannot obtain its required worst-case reservation. This is
+not a claim that the user's external account balance is $8.07. Deferred request
+`request-00614` has zero paid sends; its journal and budget-deferral evidence are
+preserved. Known received-response charge estimates total $65.251681 across the
+historical ledger, excluding unknown original sends and any account adjustments.
+
+Engineering checks pass with the pinned integrations configured: **502 Python
+tests, 1,200 differential cases, 61 Node checks**, and 100,000 compiler mutations
+under address/undefined-behavior sanitizers. Leak checking is unavailable under
+the environment's ptrace restrictions and was explicitly disabled. A numeric
+row-matching edge case was fixed and checked against exhaustive small-case
+matching; no retained Luna/Sol or current Astra public score changes. Human
+interpretation review and the earlier public-reference ambiguities remain
+limitations. These results compare complete interfaces on controlled tasks,
+not intrinsic language superiority or cross-provider generalization.
+
+Artifacts are under `resources/experiments/scale-study-2026-11-16/multi-model/`:
+`model-studies/`, `natsql-controls/`, the reference/cache/literal audits,
+`quality-audit.json`, and `natsql-failure-review.json`. Frozen originals are
+preserved. Analysis overlays distinguish known received-response usage from
+unknown original sends; prepared checks and model results remain separate.
 
 ## Expanded evaluation: 2,034 questions (November 16)
 

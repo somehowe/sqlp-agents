@@ -23,6 +23,25 @@ from .run_pilot import (ReplayProvider, _Journal, _public_catalog, _settings,
 from .validate_dataset import PreflightTimeoutError, validate_dataset
 
 
+def _checked_converter_options(options):
+    """Validate explicit profiles before a provider can be invoked."""
+    if not isinstance(options, dict) or "upstream" not in options:
+        raise ValueError("Supply explicit pinned converter options including upstream")
+    if set(options) - {"upstream", "python", "nltk_data", "timeout_seconds", "use_from_info", "network_profile", "schema_cache", "literal_profile"}:
+        raise ValueError("Unknown NatSQL converter option")
+    if options.get("network_profile", "enlarged") not in ("enlarged", "base", "enlarged-indexed"):
+        raise ValueError("NatSQL network_profile must be enlarged, enlarged-indexed or base")
+    if options.get("literal_profile", "native") not in ("native", "preserved"):
+        raise ValueError("NatSQL literal_profile must be native or preserved")
+    if "schema_cache" in options:
+        cache = options["schema_cache"]
+        if (not isinstance(cache, dict) or set(cache) != {"manifest", "sha256"} or
+                not isinstance(cache["manifest"], (str, Path)) or not isinstance(cache["sha256"], str) or
+                len(cache["sha256"]) != 64 or any(c not in "0123456789abcdef" for c in cache["sha256"])):
+            raise ValueError("Supply schema_cache manifest and exact SHA256")
+    return dict(options)
+
+
 def plan_natsql(catalog, workload, *, guide, settings, seed=0, max_rows=1000):
     """Plan public requests only; no database, converter, or model is accessed."""
     _check_workload(workload, max_rows)
@@ -111,10 +130,7 @@ def run_natsql_pilot(database_path, catalog, workload, *, guide, settings,
             provider.validate_requests(report["requests"])
         elif isinstance(provider, ReplayProvider):
             raise ValueError("ReplayProvider must be labeled replay")
-        if not isinstance(converter_options, dict) or "upstream" not in converter_options:
-            raise ValueError("Supply explicit pinned converter options including upstream")
-        if set(converter_options) - {"upstream", "python", "nltk_data", "timeout_seconds", "use_from_info"}:
-            raise ValueError("Unknown NatSQL converter option")
+        converter_options = _checked_converter_options(converter_options)
     except (ValueError, KeyError, TypeError, OverflowError) as error:
         if isinstance(error, SetupError):
             raise

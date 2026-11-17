@@ -94,6 +94,29 @@ class NatSQLPilotTests(unittest.TestCase):
         self.assertIn("adapter_sha256", report["manifest"])
         self.assertNotIn("compiler_sha256", report["manifest"])
 
+    def test_explicit_network_profile_reaches_converter_and_manifest_before_calls(self):
+        seen = []
+        def converted(query, database, catalog, **options):
+            seen.append(options["network_profile"])
+            result = self.converted(query, database, catalog, **options)
+            result["compiler_options"]["network_profile"] = options["network_profile"]
+            return result
+        for profile in ("base", "enlarged-indexed"):
+            with patch.object(pilot.natsql_adapter, "convert", side_effect=converted):
+                report = pilot.run_natsql_pilot(self.database, self.catalog, self.workload,
+                    guide=self.guide, settings=SETTINGS, origin="live", provider=lambda p: response(),
+                    journal_path=self.directory / (profile + ".jsonl"), max_requests=1,
+                    converter_options={"upstream": self.directory, "network_profile": profile})
+            self.assertEqual(seen[-2:], [profile, profile])
+            self.assertEqual(report["manifest"]["converter_options"]["network_profile"], profile)
+        provider = Mock(side_effect=AssertionError("must not call"))
+        with self.assertRaisesRegex(SetupError, "network_profile"):
+            pilot.run_natsql_pilot(self.database, self.catalog, self.workload,
+                guide=self.guide, settings=SETTINGS, origin="live", provider=provider,
+                journal_path=self.directory / "bad-profile.jsonl", max_requests=1,
+                converter_options={"upstream": self.directory, "network_profile": "unknown"})
+        provider.assert_not_called()
+
     def test_converter_rejection_remains_scored_attempt_with_usage(self):
         def convert(query, *arguments, **options):
             if query == NATSQL:

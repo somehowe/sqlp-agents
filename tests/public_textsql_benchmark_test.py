@@ -12,7 +12,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from tools.public_textsql_benchmark import prepare, query_features, score_case, score_generated
+from tools.public_textsql_benchmark import _matching_rows, prepare, query_features, score_case, score_generated
 
 
 def ast():
@@ -101,6 +101,19 @@ class ScoringTests(unittest.TestCase):
         query = "SELECT 'b',0.5 UNION ALL SELECT 'a',0.333333333 UNION ALL SELECT 'a',0.333333333"
         self.assertTrue(self.score(expected, query)["correct"])
         self.assertFalse(self.score(expected, "SELECT 'a',0.333333333 UNION ALL SELECT 'b',0.5")["correct"])
+
+    def test_close_numeric_coordinates_can_require_cross_pairing(self):
+        actual = [[0.0, 2], [5e-9, 1]]
+        expected = [[0.0, 1], [5e-9, 2]]
+        self.assertTrue(_matching_rows(actual, expected, False))
+        self.assertFalse(_matching_rows(actual, expected, True))
+        self.assertFalse(_matching_rows(actual, [[0.0, 1], [5e-9, 1]], False))
+
+    def test_tolerance_matching_must_preserve_numeric_row_correlations(self):
+        actual = [[0.0, 0.0], [5e-9, 1.0], [1.0, 2.0]]
+        expected = [[0.0, 1.0], [5e-9, 2.0], [1.0, 0.0]]
+        self.assertFalse(_matching_rows(actual, expected, False))
+        self.assertTrue(_matching_rows(actual + actual, actual + actual, False))
 
     def test_failed_gold_stays_unscorable_and_read_only_write_is_rejected(self):
         bad = {"gold_status": "error", "gold_error": {"code": "text_decoding"}}

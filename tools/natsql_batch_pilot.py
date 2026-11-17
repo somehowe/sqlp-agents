@@ -29,7 +29,7 @@ from .run_pilot import (ReplayProvider, _Journal, _public_catalog,
 from .batch_pilot import (build_batch_request as _paired_batch_request,
                           parse_batch_queries, _failed)
 from . import natsql_adapter
-from .natsql_pilot import _conversion, _empty_run
+from .natsql_pilot import _checked_converter_options, _conversion, _empty_run
 
 LANGUAGES = ("sql", "sqlp", "natsql")
 
@@ -92,11 +92,7 @@ def run_batch_pilot(database_path, catalog, workload, compiler_path=DEFAULT_COMP
             raise ValueError("Supply corresponding SQL, SQLP, and NatSQL guides")
         natsql_adapter.schema_input(catalog)
         if origin != "dry_run":
-            if not isinstance(converter_options, dict) or "upstream" not in converter_options:
-                raise ValueError("Supply explicit pinned NatSQL converter options including upstream")
-            if set(converter_options) - {"upstream", "python", "nltk_data", "timeout_seconds", "use_from_info"}:
-                raise ValueError("Unknown NatSQL converter option")
-            converter_options = dict(converter_options)
+            converter_options = _checked_converter_options(converter_options)
         if type(max_rows) is not int or not 1 <= max_rows < sys.maxsize:
             raise ValueError("max_rows must be a positive integer below sys.maxsize")
         for limit in (timeout_seconds, preflight_timeout_seconds):

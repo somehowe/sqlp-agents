@@ -6,7 +6,8 @@ execution check, not Spider's official structural/official execution metric.
 """
 
 import argparse
-from collections import Counter
+from bisect import bisect_left, bisect_right
+from collections import Counter, deque
 from contextlib import closing
 import hashlib
 import json
@@ -207,8 +208,9 @@ def _matching_rows(actual, expected, ordered):
         return True
     if len(actual) != len(expected):
         return False
-    # Partition on exact nonnumeric values before comparing numeric tuples. This
-    # retains duplicates and avoids quadratic matching on large answer bags.
+    # Exact text/null partitions preserve multiplicity. Sorting numeric tuples
+    # is a fast sufficient check, but close first coordinates can sort rows in
+    # different orders, so ambiguous tuples need a one-to-one matching.
     def groups(rows):
         result = {}
         for row in rows:
@@ -221,8 +223,62 @@ def _matching_rows(actual, expected, ordered):
     first_groups, second_groups = groups(actual), groups(expected)
     if first_groups.keys() != second_groups.keys():
         return False
-    return all(_matching_rows(sorted(rows), sorted(second_groups[key]), True)
+    return all(_matching_numeric_bags(rows, second_groups[key])
                for key, rows in first_groups.items())
+
+
+def _matching_numeric_bags(actual, expected):
+    if len(actual) != len(expected):
+        return False
+    actual, expected = sorted(actual), sorted(expected)
+    if _matching_rows(actual, expected, True):
+        return True
+    if not actual or not actual[0]:
+        return False
+    # A mismatch in a column's sorted marginal rules out any row matching.
+    for column in range(len(actual[0])):
+        first = sorted(row[column] for row in actual)
+        second = sorted(row[column] for row in expected)
+        if not all(map(_equivalent, first, second)):
+            return False
+    coordinates = [row[0] for row in expected]
+    candidates = []
+    for row in actual:
+        # math.isclose uses max(abs(a), abs(b)); this wider interval includes
+        # every permitted b, after which every coordinate is checked exactly.
+        window = max(1e-8, abs(row[0]) * 1e-6 / (1 - 1e-6))
+        low = bisect_left(coordinates, math.nextafter(row[0] - window, -math.inf))
+        high = bisect_right(coordinates, math.nextafter(row[0] + window, math.inf))
+        matches = [index for index in range(low, high)
+                   if all(map(_equivalent, row, expected[index]))]
+        if not matches:
+            return False
+        candidates.append(matches)
+    owners = [-1] * len(expected)
+    for source in sorted(range(len(actual)), key=lambda index: len(candidates[index])):
+        queue, previous_left, previous_right = deque([source]), {source: None}, {}
+        terminal = None
+        while queue and terminal is None:
+            left = queue.popleft()
+            for right in candidates[left]:
+                if right in previous_right:
+                    continue
+                previous_right[right] = left
+                if owners[right] == -1:
+                    terminal = right
+                    break
+                owner = owners[right]
+                if owner not in previous_left:
+                    previous_left[owner] = right
+                    queue.append(owner)
+        if terminal is None:
+            return False
+        right = terminal
+        while right is not None:
+            left = previous_right[right]
+            owners[right] = left
+            right = previous_left[left]
+    return True
 
 
 def score_case(connection, case, query, *, max_rows=100_000, timeout_seconds=5.0):

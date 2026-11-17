@@ -10,12 +10,14 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import natsql_adapter as adapter
+from tools import natsql_cache
 from tools.validate_dataset import load_catalog
 
 
@@ -146,6 +148,117 @@ class AdapterTests(unittest.TestCase):
                 self.convert(timeout_seconds=timeout)
         with self.assertRaises(ValueError):
             self.convert(use_from_info="yes")
+        for profile in (None, "", "fast", True, ["base"]):
+            with self.assertRaises(ValueError):
+                self.convert(network_profile=profile)
+        for profile in (None, "", "repair", True):
+            with self.assertRaises(ValueError):
+                self.convert(literal_profile=profile)
+
+    def test_network_profile_is_explicit_and_default_remains_enlarged(self):
+        for supplied, expected in (({}, "enlarged"), ({"network_profile": "base"}, "base"),
+                                   ({"network_profile": "enlarged-indexed"}, "enlarged-indexed")):
+            def fake(command, **options):
+                request = json.loads(Path(command[-1]).read_text())
+                self.assertEqual(request["network_profile"], expected)
+                self.assertEqual(request["literal_profile"], "native")
+                self.assertEqual(request["schema"], adapter.schema_input(self.catalog))
+                options["stdout"].write(json.dumps({"version": 1, "ok": True,
+                    "backend": "natsql", "sql": "select 1"}).encode())
+                return subprocess.CompletedProcess(command, 0)
+            with patch.object(adapter.subprocess, "run", side_effect=fake):
+                self.assertTrue(self.convert(**supplied)["ok"])
+
+    def test_base_schema_keeps_all_facts_and_skips_only_enlargement(self):
+        original = adapter.schema_input(self.catalog)
+        traces, outputs = {}, {}
+        for profile in ("enlarged", "base"):
+            called = []
+            def transform(schema, flags, tokens):
+                called.append("transform")
+                schema["table_column_names_original"] = copy.deepcopy(schema["column_names_original"])
+                return schema
+            def identity(name):
+                def apply(schema):
+                    called.append(name)
+                    return schema
+                return apply
+            def network(schema):
+                called.append("network")
+                schema["network"] = [[[], [0]]]
+                return schema
+            def enlarge(networks, schema):
+                called.append("enlarge")
+                return networks + [[[], [1]]]
+            def bridge(schemas):
+                called.append("bridge")
+            functions = SimpleNamespace(table_transform=transform,
+                build_index_range=identity("index"), expand_foreign_key=identity("expand"),
+                build_table_network=network, enlarge_network=enlarge,
+                bridge_table_for_many2many_relationship=bridge,
+                reversed_link_back_col=lambda key, schema: key)
+            schema, trace = adapter._structural_schema(copy.deepcopy(original), functions, profile)
+            expected = ["transform", "index", "expand", "network"]
+            if profile == "enlarged":
+                expected.append("enlarge")
+            self.assertEqual(called, expected + ["bridge"])
+            for key in ("table_names_original", "column_names_original", "foreign_keys", "primary_keys"):
+                self.assertEqual(schema[key], original[key])
+            self.assertEqual(trace["enlarge_network_applied"], profile == "enlarged")
+            self.assertEqual(trace["base_network_count"], 1)
+            self.assertEqual(trace["final_network_count"], 2 if profile == "enlarged" else 1)
+            traces[profile], outputs[profile] = trace, schema
+        self.assertEqual(traces["base"]["input_schema_sha256"], traces["enlarged"]["input_schema_sha256"])
+        self.assertEqual(adapter.schema_input(self.catalog), original)
+
+    def test_prepared_schema_roundtrip_preserves_integer_keys_and_nested_types(self):
+        value = {"many2many": {0: [1, 2], 3: [4]}, "other": ("tuple", [True, None]),
+                 1: "integer key", "1": "different string key"}
+        restored = natsql_cache.decode(json.loads(json.dumps(natsql_cache.encode(value))))
+        self.assertEqual(restored, value)
+        self.assertIn(0, restored["many2many"])
+        self.assertIs(type(restored["other"]), tuple)
+
+    def test_prepared_schema_rejects_tamper_and_foreign_facts_before_process(self):
+        original = adapter.schema_input(self.catalog)
+        key = adapter._schema_cache_key(original, "enlarged-indexed")
+        schema = {**original, "many2many": {0: [1, 2]}}
+        target = self.directory / "prepared.json"
+        trace = {"input_schema_sha256": key["input_schema_sha256"]}
+        expected = natsql_cache.write_schema(target, schema, trace, key)
+        manifest = self.directory / "manifest.json"
+        manifest.write_text(json.dumps({"version": 1, "kind": "natsql_prepared_schema_cache", "entries": [
+            {"cache_key_sha256": natsql_cache.key_digest(key), "file": target.name, "sha256": expected}]}))
+        config = {"manifest": str(manifest), "sha256": natsql_cache.sha(manifest)}
+        self.assertEqual(natsql_cache.load_schema(target, expected, key)[0], schema)
+        self.assertEqual(natsql_cache.resolve_manifest(config, key)["sha256"], expected)
+        changed = copy.deepcopy(original)
+        changed["table_names_original"][0] = "Different"
+        foreign = adapter._schema_cache_key(changed, "enlarged-indexed")
+        with self.assertRaisesRegex(ValueError, "no unique entry"):
+            natsql_cache.resolve_manifest(config, foreign)
+        target.chmod(0o600)
+        target.write_text("changed cache")
+        with patch.object(adapter.subprocess, "run") as run:
+            with self.assertRaisesRegex(ValueError, "SHA256 mismatch"):
+                self.convert(network_profile="enlarged-indexed", schema_cache=config)
+        run.assert_not_called()
+        with self.assertRaisesRegex(ValueError, "manifest SHA256 mismatch"):
+            natsql_cache.resolve_manifest({**config, "sha256": "0" * 64}, key)
+
+    def test_prepared_schema_rejects_implementation_and_profile_changes(self):
+        schema = adapter.schema_input(self.catalog)
+        key = adapter._schema_cache_key(schema, "enlarged-indexed")
+        target = self.directory / "prepared.json"
+        expected = natsql_cache.write_schema(target, schema,
+            {"input_schema_sha256": key["input_schema_sha256"]}, key)
+        for field in ("adapter_sha256", "index_implementation_sha256", "network_profile", "source_blobs"):
+            changed = copy.deepcopy(key)
+            changed[field] = "different"
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "different facts"):
+                natsql_cache.load_schema(target, expected, changed)
+        with self.assertRaisesRegex(ValueError, "require the enlarged-indexed"):
+            self.convert(schema_cache={"manifest": "missing", "sha256": "0" * 64})
 
 
 @unittest.skipUnless(os.environ.get("SQLP_NATSQL_UPSTREAM") and os.environ.get("SQLP_NATSQL_PYTHON")
@@ -156,10 +269,81 @@ class FullConverterTests(unittest.TestCase):
     # adapter tests above do not constitute converter compatibility evidence.
     setUp = AdapterTests.setUp
 
-    def full(self, query):
+    def full(self, query, **options):
         return adapter.convert(query, self.database, self.catalog,
             upstream=os.environ["SQLP_NATSQL_UPSTREAM"], python=os.environ["SQLP_NATSQL_PYTHON"],
+            nltk_data=os.environ["SQLP_NATSQL_DATA"], **options)
+
+    def test_full_base_profile_is_explicit_and_does_not_prune_schema(self):
+        query = "select AUTHOR.name from AUTHOR where AUTHOR.aid = 1"
+        base = self.full(query, network_profile="base")
+        default = self.full(query)
+        self.assertTrue(base["ok"], base)
+        self.assertTrue(default["ok"], default)
+        self.assertEqual(base["schema_profile"], "reviewed-structural-base-v2")
+        self.assertEqual(default["schema_profile"], "reviewed-structural-v1")
+        self.assertFalse(base["schema_preparation"]["enlarge_network_applied"])
+        self.assertTrue(default["schema_preparation"]["enlarge_network_applied"])
+        self.assertEqual(base["schema_preparation"]["input_schema_sha256"],
+                         default["schema_preparation"]["input_schema_sha256"])
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute(base["sql"]).fetchall(), [("Alice",)])
+
+    def test_full_indexed_profile_preserves_enlarged_network_and_query_behavior(self):
+        query = "select WROTE.author_aid, AUTHOR.name from WROTE where UNIVERSITY.country = 'CA'"
+        indexed = self.full(query, network_profile="enlarged-indexed")
+        default = self.full(query)
+        self.assertTrue(indexed["ok"], indexed)
+        self.assertTrue(default["ok"], default)
+        self.assertEqual(indexed["schema_profile"], "reviewed-structural-enlarged-indexed-v3")
+        self.assertEqual(indexed["compiler_options"]["network_profile"], "enlarged-indexed")
+        self.assertEqual(indexed["schema_preparation"]["input_schema_sha256"],
+                         default["schema_preparation"]["input_schema_sha256"])
+        self.assertEqual(indexed["schema_preparation"]["final_network_count"],
+                         default["schema_preparation"]["final_network_count"])
+        self.assertTrue(indexed["schema_preparation"]["enlarge_network_applied"])
+        self.assertIn("index_implementation_sha256", indexed["schema_preparation"])
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(Counter(connection.execute(indexed["sql"]).fetchall()),
+                             Counter(connection.execute(default["sql"]).fetchall()))
+
+    def test_full_cached_indexed_schema_preserves_query_and_many2many_keys(self):
+        destination = self.directory / "prepared-schemas"
+        manifest = adapter.prepare_schema_cache({"academic": self.catalog}, destination,
+            upstream=os.environ["SQLP_NATSQL_UPSTREAM"], python=os.environ["SQLP_NATSQL_PYTHON"],
             nltk_data=os.environ["SQLP_NATSQL_DATA"])
+        cache = {"manifest": str(destination / "manifest.json"),
+                 "sha256": natsql_cache.sha(destination / "manifest.json")}
+        query = "select WROTE.author_aid, AUTHOR.name from WROTE where UNIVERSITY.country = 'CA'"
+        cached = self.full(query, network_profile="enlarged-indexed", schema_cache=cache)
+        uncached = self.full(query, network_profile="enlarged-indexed")
+        self.assertTrue(cached["ok"], cached)
+        self.assertTrue(uncached["ok"], uncached)
+        self.assertTrue(cached["schema_preparation"]["cache_hit"])
+        self.assertFalse(uncached["schema_preparation"]["cache_hit"])
+        self.assertEqual(cached["schema_preparation"]["final_network_count"],
+                         uncached["schema_preparation"]["final_network_count"])
+        self.assertEqual(cached["schema_preparation"]["prepared_schema_sha256"], manifest["entries"][0]["sha256"])
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(Counter(connection.execute(cached["sql"]).fetchall()),
+                             Counter(connection.execute(uncached["sql"]).fetchall()))
+
+    def test_full_preserved_literal_transport_keeps_apostrophe_values(self):
+        with sqlite3.connect(self.database) as connection:
+            connection.execute("UPDATE AUTHOR SET name=? WHERE aid=1", ("O'Neil",))
+        query = "select AUTHOR.name from AUTHOR where AUTHOR.name = 'O''Neil'"
+        native = self.full(query)
+        self.assertFalse(native["ok"], native)
+        preserved = self.full(query, network_profile="enlarged-indexed", literal_profile="preserved")
+        self.assertTrue(preserved["ok"], preserved)
+        self.assertEqual(preserved["compiler_options"]["literal_profile"], "preserved")
+        self.assertEqual(preserved["literal_transport"]["literal_count"], 1)
+        self.assertIn("source_sha256", preserved["literal_transport"])
+        with sqlite3.connect(self.database) as connection:
+            self.assertEqual(connection.execute(preserved["sql"]).fetchall(), [("O'Neil",)])
+        malformed = self.full("select AUTHOR.name from AUTHOR where AUTHOR.name = 'unclosed",
+                              literal_profile="preserved")
+        self.assertFalse(malformed["ok"], malformed)
 
     def assert_answers(self, natsql, oracle):
         result = self.full(natsql)

@@ -1,6 +1,6 @@
 # Agent context — SQLP for AI Agents
 
-Updated November 16, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
+Updated November 17, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
 
 ## Current direction and context
 
@@ -36,6 +36,41 @@ The Python runner orchestrates execution; the local viewer consumes its saved re
 
 ## Actual code at this update
 
+November 17 follow-up: the complete 1,000-question SQL/SQLP stress comparison now
+has actual retained results for Luna, Sol, and Astra. SQL matches 946/999/1000;
+SQLP matches 990/1000/1000. Total SQLP token changes are -10.70%/-7.11%/-8.27%.
+The same questions recur across models; do not call these 3,000 independent
+questions. The wider public SQL challenge is complete for Luna/Sol and partial
+for Astra; consult current reports before claiming all 2,034 questions ran on
+every model.
+
+NatSQL now has 188 actual model outputs per model from an outcome-independent
+structural subset with exact original SQL/SQLP counterparts. Raw matches are
+171/184/183; four prepared reference encodings fail in the converter. On the
+184 reference-compatible cases, SQL/SQLP match all 184 in every model; NatSQL
+matches 171/184/183. A clean whole-batch supplement contains 176 questions.
+The declared indexed, cached, literal-preserving adapter profile retains full
+catalogs and upstream file pins; default legacy behavior remains unchanged.
+Do not call this the unchanged original preprocessing driver. See
+[NATSQL.md](NATSQL.md) and [STUDY_RESULTS.md](STUDY_RESULTS.md).
+
+All five lost original transport sends remain reserved and their usage unknown,
+even after separately labelled, identical-payload recovery succeeds. Two are in
+the NatSQL controls and three in the public SQL challenge. Exact whole-API token
+totals are unknown; supported SQL/SQLP totals remain known. Use
+`scale_accounting.py` rather than summing retained responses as complete API
+usage. `recover_scale_transport.py` requires an explicit immutable recovery plan;
+never automatically repeat an uncertain send or erase its reservation.
+
+New model/protocol helpers are `scale_model_matrix.py` and
+`natsql_scale_controls.py`; new adapter helpers are `natsql_network.py`,
+`natsql_cache.py`, and `natsql_literals.py`. Artifacts live under the original
+scale-study directory's `multi-model/` folder. Existing frozen studies are not
+rewritten. Financial reservation reconciliation uses exact response/request
+proofs with immutable backups, never a silent budget reset. The user's reported
+external account balance is separate from the historical lifetime $100 guard;
+clarification of funding scope has been requested before increasing that guard.
+
 The November 16 scale expansion adds 1,000 distinct constructed SQL/SQLP tasks
 over four larger synthetic relationship graphs and all 1,034 public Spider dev
 questions as a separate SQL challenge. Primary data totals 599,764 rows across
@@ -58,11 +93,12 @@ The main protocol uses Luna/high reasoning, matched batches of four, and a
 `resources/experiments/scale-study-2026-11-16/study/`; preserve frozen originals
 and the existing cumulative $100 ledger. `prepare_natsql_scale_subset.py`
 selects 188 structurally eligible questions from 47 complete original batches
-without reading model outcomes. A NatSQL follow-up must pass converter preflight
-before paid calls; the pinned converter currently stalls in full-catalog join
-network expansion. This setup limit is not a generated-query accuracy result.
+without reading model outcomes. The original NatSQL driver stalls during full
+catalog expansion; the explicitly declared November 17 adapter profile above
+was preflighted before the new model calls. Earlier setup limits remain archived
+separately from generated-query accuracy results.
 
-The current checks cover the C++ suites, 413 Python tests, 1,200 differential
+The current checks cover the C++ suites, 502 Python tests, 1,200 differential
 queries, and 61 Node checks (23 saved-viewer plus 38 Path Studio checks). Optional
 integrations skip when their separate inputs are unavailable; fresh checkouts
 can have more skips than Ryan's configured environment. A real Chromium

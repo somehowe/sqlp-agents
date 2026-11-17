@@ -101,6 +101,21 @@ class NatSQLBatchPilotTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pilot.build_batch_request(tasks, catalog, "other", "guide", SETTINGS)
 
+    def test_explicit_base_network_profile_is_forwarded_and_preserved(self):
+        seen = []
+        def converted(query, database, catalog, **options):
+            seen.append(options["network_profile"])
+            result = self.converted(query, database, catalog, **options)
+            result["compiler_options"]["network_profile"] = options["network_profile"]
+            return result
+        for profile in ("base", "enlarged-indexed"):
+            with patch.object(pilot.natsql_adapter, "convert", side_effect=converted):
+                report = self.plan(origin="live", provider=answer,
+                    journal_path=self.root / (profile + ".jsonl"), max_requests=100,
+                    converter_options={"upstream": self.root, "network_profile": profile})
+            self.assertEqual(seen[-3:], [profile, profile, profile])
+            self.assertEqual(report["manifest"]["converter_options"]["network_profile"], profile)
+
     def test_dry_plan_counts_and_hashes_never_invoke_converter_or_scorer(self):
         for size, expected in [(1, 36), (4, 9), (12, 3)]:
             with self.subTest(size=size), patch.object(pilot.natsql_adapter, "convert") as conv, patch.object(pilot, "_condition") as score:

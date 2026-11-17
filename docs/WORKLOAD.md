@@ -42,7 +42,13 @@ The outcome-independent NatSQL subset exporter preserves 188 questions from
 47 complete original batches without repeated physical-table bindings. Its
 eight offline converter preflights time out on the full catalogs; a serial trace
 locates the bottleneck in official join-network expansion beyond 90 seconds.
-No new NatSQL model calls or accuracy denominator are reported.
+The initial November 16 preflight made no NatSQL model calls. The separately
+declared November 17 indexed/cached/literal-preserving adapter enabled all 188 targets
+on Luna, Sol, and Astra. Four reference encodings still return no SQL; the other
+184 pass both snapshots after a documented serial timeout check. Raw model
+matches are 171/188, 184/188, and 183/188. All SQL/SQLP counterparts match 188/188;
+the same questions are not counted again as new distinct tasks. See
+[the follow-up results](STUDY_RESULTS.md) and [adapter details](NATSQL.md).
 
 Public scoring compares requested columns and duplicate counts, respects an
 outer ORDER BY, and uses numeric relative tolerance 1e-6 and absolute tolerance
@@ -92,6 +98,20 @@ scoring; resume reuses them and refuses uncertain duplicate sends. Usage belongs
 to whole batches and includes failures. The saved-query validator checks
 coverage, request/response bindings, usage, hashes, primary execution, and
 alternate snapshots without additional model calls.
+
+`tools.scale_model_matrix` clones the original frozen study for Sol and Astra
+with only model identifiers and request hashes changed. It keeps the completed
+Luna records. `tools.natsql_scale_controls` freezes the 188-case subset, original
+B4 counterparts, guide, converter profile, full prepared-schema cache, and
+reference coverage before any NatSQL model calls. The 176-question whole-batch
+supplement is fixed from reference preflight rather than model outcomes.
+
+Transport-only recoveries use an explicit plan with a distinct paid ledger
+binding and unchanged request payload. The original unknown-charge reservation
+stays held. Use `tools.scale_accounting` and the recovery-aware validator to
+distinguish known received-response token subtotals from unknown whole-API usage;
+do not substitute successful-response sums for all interaction costs. These
+recoveries give no query feedback or repair instructions to the model.
 
 ## Chinook case study
 

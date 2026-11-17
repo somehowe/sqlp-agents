@@ -25,7 +25,7 @@ from .compiler_catalog import catalog_argument_file
 from .credentials import load_api_key
 from .model_provider import OpenAIResponsesClient, ProviderError, parse_response
 from .natsql_batch_pilot import build_batch_request
-from .natsql_pilot import _conversion, _empty_run
+from .natsql_pilot import _checked_converter_options, _conversion, _empty_run
 from .research_budget import BudgetedProvider
 from .run_comparison import DEFAULT_COMPILER, SQLITE_BYTES, _condition
 from .run_pilot import _settings, digest
@@ -115,7 +115,8 @@ def _copy_dataset(source, destination):
 def prepare(output, *, supported=None, public=None, compiler_path=DEFAULT_COMPILER,
             model="gpt-6-luna", batch_size=4, languages=("sql", "sqlp"),
             max_output_tokens=8192, reasoning_effort="high", seed=20261116,
-            ledger=DEFAULT_LEDGER, guides=None):
+            ledger=DEFAULT_LEDGER, guides=None, natsql_network_profile=None,
+            natsql_literal_profile=None, natsql_schema_cache=None, reference_files=()):
     """Freeze all inputs and exact public requests without invoking any provider."""
     output = Path(output).resolve()
     if output.exists():
@@ -126,6 +127,14 @@ def prepare(output, *, supported=None, public=None, compiler_path=DEFAULT_COMPIL
         raise ValueError("Batch size must be between 1 and 100")
     if not languages or set(languages) - {"sql", "sqlp", "natsql"} or len(set(languages)) != len(languages):
         raise ValueError("Choose distinct sql/sqlp/natsql languages")
+    if natsql_network_profile is not None and ("natsql" not in languages or
+            natsql_network_profile not in ("enlarged", "base", "enlarged-indexed")):
+        raise ValueError("An explicit NatSQL network profile requires the NatSQL condition")
+    if natsql_literal_profile is not None and ("natsql" not in languages or
+            natsql_literal_profile not in ("native", "preserved")):
+        raise ValueError("An explicit NatSQL literal profile requires the NatSQL condition")
+    if natsql_schema_cache is not None and natsql_network_profile != "enlarged-indexed":
+        raise ValueError("Prepared NatSQL schemas require the indexed profile")
     settings = _settings({"model": model, "max_output_tokens": max_output_tokens,
                           "reasoning": {"effort": reasoning_effort}})
     output.mkdir(parents=True, mode=0o700)
@@ -140,6 +149,21 @@ def prepare(output, *, supported=None, public=None, compiler_path=DEFAULT_COMPIL
     # Retain a runnable copy of Python orchestration/scoring, alongside its hashes.
     shutil.copytree(ROOT / "tools", output / "runtime/tools",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    cache_binding = None
+    if natsql_schema_cache is not None:
+        cache_source = Path(natsql_schema_cache).resolve()
+        if cache_source.is_dir():
+            cache_source = cache_source / "manifest.json"
+        cache_manifest = read(cache_source)
+        if cache_manifest.get("kind") != "natsql_prepared_schema_cache":
+            raise ValueError("Expected a NatSQL prepared-schema manifest")
+        shutil.copytree(cache_source.parent, output / "converter-cache")
+        cache_binding = {"manifest": "converter-cache/" + cache_source.name,
+                         "sha256": sha(output / "converter-cache" / cache_source.name)}
+    if reference_files:
+        (output / "reference-preflight").mkdir()
+        for reference in reference_files:
+            shutil.copy2(reference, output / "reference-preflight" / Path(reference).name)
     datasets, requests, rng = [], [], random.Random(seed)
     for stratum, source in (("supported", supported), ("public", public)):
         if source is None:
@@ -163,6 +187,12 @@ def prepare(output, *, supported=None, public=None, compiler_path=DEFAULT_COMPIL
                 dataset.update({key: str(base / entry[key])
                                 for key in ("database", "schema", "tasks", "workload")})
             workload = read(output / dataset["workload"])
+            if cache_binding is not None and stratum == "supported":
+                from . import natsql_adapter, natsql_cache
+                key = natsql_adapter._schema_cache_key(
+                    natsql_adapter.schema_input(read(output / dataset["catalog"])), natsql_network_profile)
+                natsql_cache.resolve_manifest({"manifest": output / cache_binding["manifest"],
+                                               "sha256": cache_binding["sha256"]}, key)
             cases = workload["cases"]
             dataset["case_count"] = len(cases)
             if stratum == "public":
@@ -189,7 +219,7 @@ def prepare(output, *, supported=None, public=None, compiler_path=DEFAULT_COMPIL
                     requests.append(request)
     if len({r["request_sha256"] for r in requests}) != len(requests):
         raise ValueError("Duplicate exact requests prevent safe recovery")
-    frozen = {str(p.relative_to(output)): sha(p) for parent in ("inputs", "guides", "runtime")
+    frozen = {str(p.relative_to(output)): sha(p) for parent in ("inputs", "guides", "runtime", "converter-cache", "reference-preflight")
               for p in sorted((output / parent).rglob("*")) if p.is_file()}
     frozen["sqlpc"] = sha(output / "sqlpc")
     design = {"version": 1, "kind": "scale_textsql_study", "settings": settings,
@@ -207,6 +237,12 @@ def prepare(output, *, supported=None, public=None, compiler_path=DEFAULT_COMPIL
               "planned_unique_questions": sum(d["case_count"] for d in datasets),
               "planned_calls": len(requests),
               "planned_outputs": sum(len(r["case_ids"]) for r in requests)}
+    if natsql_network_profile is not None:
+        design["converter_profile"] = {"network_profile": natsql_network_profile}
+    if natsql_literal_profile is not None:
+        design.setdefault("converter_profile", {})["literal_profile"] = natsql_literal_profile
+    if cache_binding is not None:
+        design["converter_schema_cache"] = cache_binding
     write_new(output / "design.json", design)
     return {key: design[key] for key in ("planned_unique_questions", "planned_calls", "planned_outputs", "budget_before")}
 
@@ -327,6 +363,20 @@ def _run(directory, *, provider=None, api_key_file=None, ledger=DEFAULT_LEDGER,
         raise ValueError("Request cap must be nonnegative")
     if "natsql" in design["supported_languages"] and not converter_options:
         raise ValueError("NatSQL requires explicit pinned converter options")
+    if "natsql" in design["supported_languages"]:
+        converter_options = _checked_converter_options(converter_options)
+        profile = design.get("converter_profile", {}).get("network_profile")
+        if profile is not None and converter_options.get("network_profile", "enlarged") != profile:
+            raise ValueError("NatSQL network profile differs from the frozen design")
+        literal_profile = design.get("converter_profile", {}).get("literal_profile")
+        if literal_profile is not None and converter_options.get("literal_profile", "native") != literal_profile:
+            raise ValueError("NatSQL literal profile differs from the frozen design")
+        if design.get("converter_schema_cache"):
+            cache = design["converter_schema_cache"]
+            frozen_cache = {"manifest": str(directory / cache["manifest"]), "sha256": cache["sha256"]}
+            if "schema_cache" in converter_options and converter_options["schema_cache"] != frozen_cache:
+                raise ValueError("NatSQL schema cache differs from the frozen design")
+            converter_options["schema_cache"] = frozen_cache
     label = "scale-study/" + digest({"design": sha(directory / "design.json")})[:20]
     if provider is None:
         if api_key_file is None:
@@ -529,6 +579,9 @@ def main():
     parser.add_argument("--natsql-upstream", type=Path)
     parser.add_argument("--natsql-python", type=Path)
     parser.add_argument("--natsql-nltk-data", type=Path)
+    parser.add_argument("--natsql-network-profile", choices=("enlarged", "base", "enlarged-indexed"))
+    parser.add_argument("--natsql-literal-profile", choices=("native", "preserved"))
+    parser.add_argument("--natsql-schema-cache", type=Path)
     parser.add_argument("--sql-guide", type=Path)
     parser.add_argument("--sqlp-guide", type=Path)
     parser.add_argument("--natsql-guide", type=Path)
@@ -538,11 +591,21 @@ def main():
                          compiler_path=args.compiler, model=args.model, batch_size=args.batch_size,
                          languages=args.languages, max_output_tokens=args.max_output_tokens,
                          reasoning_effort=args.reasoning_effort, ledger=args.ledger,
-                         guides={l: p for l in args.languages if (p := getattr(args, l + "_guide"))})
+                         guides={l: p for l in args.languages if (p := getattr(args, l + "_guide"))},
+                         natsql_network_profile=args.natsql_network_profile,
+                         natsql_literal_profile=args.natsql_literal_profile,
+                         natsql_schema_cache=args.natsql_schema_cache)
     elif args.action == "run":
         converter = None
         if args.natsql_upstream:
             converter = {"upstream": args.natsql_upstream, "use_from_info": False}
+            if args.natsql_network_profile is not None:
+                converter["network_profile"] = args.natsql_network_profile
+            if args.natsql_literal_profile is not None:
+                converter["literal_profile"] = args.natsql_literal_profile
+            if args.natsql_schema_cache is not None:
+                cache_manifest = args.natsql_schema_cache / "manifest.json" if args.natsql_schema_cache.is_dir() else args.natsql_schema_cache
+                converter["schema_cache"] = {"manifest": str(cache_manifest.resolve()), "sha256": sha(cache_manifest)}
             for key, value in (("python", args.natsql_python), ("nltk_data", args.natsql_nltk_data)):
                 if value:
                     converter[key] = value

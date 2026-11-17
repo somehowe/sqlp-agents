@@ -41,6 +41,57 @@ SOURCE_BLOBS = {
 }
 MAX_QUERY_BYTES = 65536
 MAX_OUTPUT_BYTES = 2_000_000
+NETWORK_PROFILES = ("enlarged", "base", "enlarged-indexed")
+SCHEMA_PROFILES = {"enlarged": "reviewed-structural-v1",
+                   "base": "reviewed-structural-base-v2",
+                   "enlarged-indexed": "reviewed-structural-enlarged-indexed-v3"}
+LITERAL_PROFILES = ("native", "preserved")
+
+
+def _structural_schema(schema, transform, network_profile):
+    """Prepare full supplied facts, with an explicit network construction choice.
+
+    ``enlarged`` preserves the original structural-v1 driver. ``base`` is a
+    separately declared adapter profile, not the official preprocessing driver:
+    it omits only the legacy network-enlargement function. ``enlarged-indexed``
+    runs the verified function through an explicit adapter wrapper that indexes
+    only its duplicate predicate and preserves its ordered network output.
+    The verified upstream files, table/column/key facts and FK expansion are shared.
+    """
+    if network_profile not in NETWORK_PROFILES:
+        raise ValueError("Unknown NatSQL network profile")
+    original_hash = hashlib.sha256(json.dumps(schema, sort_keys=True,
+        separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+    original_counts = {key: len(schema[key]) for key in
+                       ("table_names_original", "column_names_original", "foreign_keys")}
+    flags = SimpleNamespace(add_alpha_to_table=False, remove_star_from_col=False,
+        modify_column_names=False, force_modify_star_column_names=False,
+        use_table_name_for_star_in_col_name=False, star_type="others")
+    schema = transform.table_transform(schema, flags, None)
+    schema = transform.build_index_range(schema)
+    schema = transform.expand_foreign_key(schema)
+    schema = transform.build_table_network(schema)
+    network_count = len(schema["network"])
+    if network_profile == "enlarged":
+        schema["network"] = transform.enlarge_network(schema["network"], schema)
+    elif network_profile == "enlarged-indexed":
+        from tools import natsql_network
+        schema["network"] = natsql_network.enlarge_network_indexed(schema["network"], schema, transform)
+    trace = {"network_profile": network_profile,
+             "enlarge_network_applied": network_profile != "base",
+             "input_schema_sha256": original_hash, "input_counts": original_counts,
+             "expanded_foreign_key_count": len(schema["foreign_keys"]),
+             "base_network_count": network_count,
+             "final_network_count": len(schema["network"])}
+    if network_profile == "enlarged-indexed":
+        trace.update(index_profile=natsql_network.INDEX_PROFILE_VERSION,
+            index_implementation_sha256=hashlib.sha256(Path(natsql_network.__file__).read_bytes()).hexdigest())
+    schema["tc_fast"] = [c[1].lower() for c in schema["table_column_names_original"]]
+    schema["table_orig_low"] = [t.lower() for t in schema["table_names_original"]]
+    transform.bridge_table_for_many2many_relationship([schema])
+    schema["unique_fk"] = [transform.reversed_link_back_col(i, schema)
+                           for i in schema["unique_fk"]]
+    return schema, trace
 
 
 def schema_input(catalog):
@@ -111,8 +162,81 @@ def _failure(kind, message):
             "error": {"kind": kind, "message": str(message)}}
 
 
+def _schema_cache_key(original_schema, network_profile):
+    from tools import natsql_cache, natsql_network
+    return natsql_cache.make_key(original_schema, network_profile,
+        adapter_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        index_sha256=hashlib.sha256(Path(natsql_network.__file__).read_bytes()).hexdigest(),
+        upstream_commit=UPSTREAM_COMMIT, source_blobs=SOURCE_BLOBS)
+
+
+def prepare_schema_cache(catalogs, output, *, upstream, python=sys.executable,
+                         nltk_data=None, timeout_seconds=60):
+    """Freeze query-independent indexed schemas once, retaining all input facts.
+
+    This requires no database, query, model response, or answer plan. The fresh
+    output and exact manifest hash can be frozen with a later study. Each cache
+    entry is bound to full catalog facts and all relevant implementation hashes.
+    """
+    from tools import natsql_cache
+    if not isinstance(catalogs, dict) or not catalogs:
+        raise ValueError("Supply named full catalogs")
+    if (type(timeout_seconds) not in (int, float) or not math.isfinite(timeout_seconds)
+            or not 0 < timeout_seconds <= 60):
+        raise ValueError("Schema preparation timeout must be positive and at most 60 seconds")
+    inputs = []
+    for name, catalog in catalogs.items():
+        if not isinstance(name, str) or not name:
+            raise ValueError("Prepared schema needs a nonempty catalog label")
+        schema = schema_input(catalog)
+        inputs.append((name, schema, _schema_cache_key(schema, "enlarged-indexed")))
+    output = Path(output).absolute()
+    output.mkdir(mode=0o700, parents=True, exist_ok=False)
+    entries = []
+    with tempfile.TemporaryDirectory(prefix="sqlp-natsql-prepare-") as temporary:
+        directory = Path(temporary)
+        source = directory / "upstream"
+        _copy_source(upstream, source)
+        for name, original_schema, key in inputs:
+            filename = natsql_cache.key_digest(key) + ".json"
+            target = output / filename
+            request = {"schema": original_schema, "upstream": str(source),
+                "network_profile": "enlarged-indexed", "use_from_info": False,
+                "nltk_data": str(Path(nltk_data).absolute()) if nltk_data else None,
+                "prepare_schema_only": True, "cache_key": key, "cache_output": str(target)}
+            request_path = directory / "request.json"
+            request_path.write_text(json.dumps(request), encoding="utf-8")
+            with (directory / "output.json").open("w+b") as destination:
+                try:
+                    process = subprocess.run([str(python), "-I", str(Path(__file__).resolve()),
+                        "--worker", str(request_path)], cwd=directory, stdout=destination,
+                        stderr=subprocess.STDOUT, timeout=timeout_seconds, check=False)
+                except subprocess.TimeoutExpired as error:
+                    raise ValueError("Indexed schema preparation exceeded its time limit") from error
+                destination.seek(0)
+                response = json.loads(destination.read(MAX_OUTPUT_BYTES + 1))
+            if process.returncode != 0 or response.get("ok") is not True:
+                raise ValueError("Indexed schema preparation failed: " + str(response.get("error", response)))
+            expected = response["prepared_schema_sha256"]
+            restored, trace, _ = natsql_cache.load_schema(target, expected, key)
+            entries.append({"catalog_id": name, "cache_key_sha256": natsql_cache.key_digest(key),
+                "input_schema_sha256": key["input_schema_sha256"], "file": filename,
+                "sha256": expected, "bytes": target.stat().st_size,
+                "schema_preparation": trace})
+    manifest = {"version": 1, "kind": "natsql_prepared_schema_cache",
+        "network_profile": "enlarged-indexed", "schema_profile": SCHEMA_PROFILES["enlarged-indexed"],
+        "model_calls": 0, "query_independent": True, "upstream_commit": UPSTREAM_COMMIT,
+        "entries": entries}
+    with (output / "manifest.json").open("x", encoding="utf-8") as destination:
+        json.dump(manifest, destination, indent=2, ensure_ascii=True, allow_nan=False)
+        destination.write("\n")
+    (output / "manifest.json").chmod(0o400)
+    return manifest
+
+
 def convert(query, database, catalog, *, upstream, python=sys.executable,
-            nltk_data=None, timeout_seconds=10.0, use_from_info=False):
+            nltk_data=None, timeout_seconds=10.0, use_from_info=False,
+            network_profile="enlarged", schema_cache=None, literal_profile="native"):
     """Translate exactly the supplied NatSQL, retaining every conversion failure.
 
     A missing dependency/source is a setup error, not a scored NatSQL mistake.
@@ -127,7 +251,18 @@ def convert(query, database, catalog, *, upstream, python=sys.executable,
         raise ValueError("NatSQL timeout must be positive and at most 60 seconds")
     if type(use_from_info) is not bool:
         raise ValueError("use_from_info must be Boolean")
+    if network_profile not in NETWORK_PROFILES:
+        raise ValueError("NatSQL network profile must be enlarged, base, or enlarged-indexed")
+    if literal_profile not in LITERAL_PROFILES:
+        raise ValueError("NatSQL literal profile must be native or preserved")
     original_schema = schema_input(catalog)
+    prepared_schema = None
+    if schema_cache is not None:
+        if network_profile != "enlarged-indexed":
+            raise ValueError("Prepared schema caches require the enlarged-indexed profile")
+        from tools import natsql_cache
+        prepared_schema = natsql_cache.resolve_manifest(schema_cache,
+            _schema_cache_key(original_schema, network_profile))
     with tempfile.TemporaryDirectory(prefix="sqlp-natsql-") as temporary:
         directory = Path(temporary)
         source = directory / "upstream"
@@ -145,6 +280,9 @@ def convert(query, database, catalog, *, upstream, python=sys.executable,
         request = {"query": query, "schema": original_schema, "upstream": str(source),
                    "database": str(directory / "snapshot.sqlite"),
                    "use_from_info": use_from_info,
+                   "network_profile": network_profile,
+                   "literal_profile": literal_profile,
+                   "prepared_schema": prepared_schema,
                    "nltk_data": str(Path(nltk_data).resolve()) if nltk_data else None}
         request_path = directory / "request.json"
         request_path.write_text(json.dumps(request), encoding="utf-8")
@@ -182,7 +320,7 @@ def convert(query, database, catalog, *, upstream, python=sys.executable,
 def _worker(request_path):
     request = json.loads(Path(request_path).read_text(encoding="utf-8"))
     sys.path.insert(0, request["upstream"])
-    response = None
+    response, schema_trace, literal_trace = None, None, None
     # Keep upstream diagnostics separately so they cannot corrupt JSON stdout.
     with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as diagnostics:
         with redirect_stdout(diagnostics), redirect_stderr(diagnostics):
@@ -197,33 +335,55 @@ def _worker(request_path):
                 response = _failure("dependency_setup", type(error).__name__ + ": " + str(error))
             if response is None:
                 try:
-                    schema = request["schema"]
-                    flags = SimpleNamespace(add_alpha_to_table=False, remove_star_from_col=False,
-                        modify_column_names=False, force_modify_star_column_names=False,
-                        use_table_name_for_star_in_col_name=False, star_type="others")
-                    schema = transform.table_transform(schema, flags, None)
-                    schema = transform.build_index_range(schema)
-                    schema = transform.expand_foreign_key(schema)
-                    schema = transform.build_table_network(schema)
-                    schema["network"] = transform.enlarge_network(schema["network"], schema)
-                    schema["tc_fast"] = [c[1].lower() for c in schema["table_column_names_original"]]
-                    schema["table_orig_low"] = [t.lower() for t in schema["table_names_original"]]
-                    # Upstream structural bridge classification, not a custom join heuristic.
-                    transform.bridge_table_for_many2many_relationship([schema])
-                    schema["unique_fk"] = [transform.reversed_link_back_col(i, schema)
-                                           for i in schema["unique_fk"]]
-                    flags = Args()
-                    flags.use_from_info = request["use_from_info"]
-                    sql, parsed, _ = create_sql_from_natSQL(request["query"], schema["db_id"],
-                        request["database"], schema, sq=None, remove_values=False, args=flags)
-                    if not isinstance(sql, str) or not sql.strip():
-                        response = _failure("conversion_rejected", "Official converter returned no SQL")
+                    profile = request.get("network_profile", "enlarged")
+                    if request.get("prepared_schema"):
+                        from tools import natsql_cache
+                        cached = request["prepared_schema"]
+                        key = _schema_cache_key(request["schema"], profile)
+                        if cached["key"] != key:
+                            raise ValueError("Prepared schema key changed before worker import")
+                        schema, schema_trace, content_hash = natsql_cache.load_schema(
+                            cached["path"], cached["sha256"], key)
+                        schema_trace.update(cache_hit=True, prepared_schema_sha256=cached["sha256"],
+                            prepared_content_sha256=content_hash,
+                            cache_manifest_sha256=cached["manifest_sha256"],
+                            cache_key_sha256=natsql_cache.key_digest(key))
                     else:
+                        schema, schema_trace = _structural_schema(request["schema"], transform, profile)
+                        if profile == "enlarged-indexed":
+                            schema_trace["cache_hit"] = False
+                    if request.get("prepare_schema_only"):
+                        from tools import natsql_cache
+                        key = _schema_cache_key(request["schema"], profile)
+                        if request["cache_key"] != key:
+                            raise ValueError("Prepared schema source key changed before worker import")
+                        prepared_hash = natsql_cache.write_schema(request["cache_output"], schema, schema_trace, key)
                         response = {"version": 1, "ok": True, "backend": "natsql",
-                            "upstream_commit": UPSTREAM_COMMIT, "upstream_version": natsql_version(),
-                            "environment": {"python": sys.version.split()[0], "nltk": nltk.__version__},
-                            "schema_profile": "reviewed-structural-v1", "sql": sql,
-                            "parameters": [], "parsed_natsql": parsed}
+                            "prepared_schema_sha256": prepared_hash}
+                    else:
+                        flags = Args()
+                        flags.use_from_info = request["use_from_info"]
+                        query = request["query"]
+                        if request.get("literal_profile", "native") == "preserved":
+                            from tools import natsql_literals
+                            query, bindings = natsql_literals.protect_literals(query)
+                            literal_trace = {**natsql_literals.transport_metadata(),
+                                "source_query_sha256": bindings["source_sha256"],
+                                "protected_query_sha256": hashlib.sha256(query.encode()).hexdigest(),
+                                "literal_count": len(bindings["literals"])}
+                        sql, parsed, _ = create_sql_from_natSQL(query, schema["db_id"],
+                            request["database"], schema, sq=None, remove_values=False, args=flags)
+                        if not isinstance(sql, str) or not sql.strip():
+                            response = _failure("conversion_rejected", "Official converter returned no SQL")
+                        else:
+                            if request.get("literal_profile", "native") == "preserved":
+                                sql = natsql_literals.restore_literals(sql, bindings)
+                            response = {"version": 1, "ok": True, "backend": "natsql",
+                                "upstream_commit": UPSTREAM_COMMIT, "upstream_version": natsql_version(),
+                                "environment": {"python": sys.version.split()[0], "nltk": nltk.__version__},
+                                "schema_profile": SCHEMA_PROFILES[profile],
+                                "schema_preparation": schema_trace, "sql": sql,
+                                "parameters": [], "parsed_natsql": parsed}
                 except Exception as error:
                     # NLTK reports absent tokenization tables with LookupError;
                     # query/schema KeyError subclasses must remain query errors.
@@ -231,8 +391,17 @@ def _worker(request_path):
                     response = _failure(kind, type(error).__name__ + ": " + str(error))
         diagnostics.seek(0)
         response["converter_diagnostics"] = diagnostics.read(16384)
+    if schema_trace is not None:
+        response["schema_preparation"] = schema_trace
+        response["schema_profile"] = SCHEMA_PROFILES[schema_trace["network_profile"]]
     response["compiler_options"] = {"use_from_info": request["use_from_info"],
                                     "remove_values": False, "sq": None}
+    if request.get("network_profile", "enlarged") != "enlarged":
+        response["compiler_options"]["network_profile"] = request["network_profile"]
+    if request.get("literal_profile", "native") != "native":
+        response["compiler_options"]["literal_profile"] = request["literal_profile"]
+    if literal_trace is not None:
+        response["literal_transport"] = literal_trace
     print(json.dumps(response, ensure_ascii=True))
 
 
@@ -249,12 +418,23 @@ def main():
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--use-from-info", action="store_true",
                         help="Explicit upstream option ablation; default remains upstream False")
+    parser.add_argument("--network-profile", choices=NETWORK_PROFILES, default="enlarged",
+                        help="Explicit adapter profile; default preserves the original upstream driver")
+    parser.add_argument("--schema-cache-manifest", type=Path)
+    parser.add_argument("--schema-cache-sha256")
+    parser.add_argument("--literal-profile", choices=LITERAL_PROFILES, default="native")
     options = parser.parse_args()
     try:
+        if bool(options.schema_cache_manifest) != bool(options.schema_cache_sha256):
+            raise ValueError("Supply both prepared-schema manifest path and SHA256")
+        cache = ({"manifest": str(options.schema_cache_manifest), "sha256": options.schema_cache_sha256}
+                 if options.schema_cache_manifest else None)
         query = sys.stdin.buffer.read(MAX_QUERY_BYTES + 1).decode("utf-8")
         response = convert(query, options.database, load_catalog(options.catalog),
             upstream=options.upstream, python=options.python, nltk_data=options.nltk_data,
-            timeout_seconds=options.timeout, use_from_info=options.use_from_info)
+            timeout_seconds=options.timeout, use_from_info=options.use_from_info,
+            network_profile=options.network_profile, schema_cache=cache,
+            literal_profile=options.literal_profile)
     except (ValueError, OSError, sqlite3.Error) as error:
         response = _failure("adapter_setup", str(error))
     print(json.dumps(response, ensure_ascii=True))

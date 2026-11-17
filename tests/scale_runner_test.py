@@ -156,6 +156,49 @@ class ScaleRunnerTests(unittest.TestCase):
         self.assertIsNone(result["token_usage"])
         self.assertEqual(result["usage_known_calls"], 0)
 
+    def test_frozen_natsql_network_profile_mismatch_stops_before_provider(self):
+        study.prepare(self.output, supported=self.source, compiler_path=ROOT / "build/sqlpc",
+                      ledger=self.ledger, batch_size=2, languages=("natsql",),
+                      natsql_network_profile="base")
+        self.assertEqual(study.verify(self.output)["converter_profile"], {"network_profile": "base"})
+        with self.assertRaisesRegex(ValueError, "frozen design"):
+            study.run(self.output, provider=lambda _: self.fail("must not call"), ledger=self.ledger,
+                      converter_options={"upstream": self.root, "network_profile": "enlarged"})
+
+    def test_frozen_natsql_cache_and_literal_profile_are_forwarded_without_public_leakage(self):
+        from unittest.mock import patch
+        cache = self.root / "cache"
+        cache.mkdir()
+        (cache / "schema.json").write_text('{"schema":"PRIVATE_SCHEMA_CACHE_SENTINEL"}')
+        study.write_new(cache / "manifest.json", {"version": 1, "kind": "natsql_prepared_schema_cache", "entries": []})
+        with patch("tools.natsql_cache.resolve_manifest") as validate:
+            study.prepare(self.output, supported=self.source, compiler_path=ROOT / "build/sqlpc",
+                          ledger=self.ledger, batch_size=2, languages=("natsql",),
+                          natsql_network_profile="enlarged-indexed", natsql_literal_profile="preserved",
+                          natsql_schema_cache=cache / "manifest.json")
+        validate.assert_called_once()
+        design = study.verify(self.output)
+        self.assertIn("converter-cache/schema.json", design["frozen_sha256"])
+        self.assertNotIn("PRIVATE_SCHEMA_CACHE_SENTINEL", json.dumps(design["requests"]))
+        expected_cache = {"manifest": str(self.output / "converter-cache/manifest.json"),
+                          "sha256": study.sha(self.output / "converter-cache/manifest.json")}
+        seen = []
+        def converted(query, database, catalog, **options):
+            seen.append(options)
+            return {"version": 1, "backend": "natsql", "ok": True,
+                    "sql": "SELECT name FROM AUTHOR;", "compiler_options": {
+                        "network_profile": "enlarged-indexed", "literal_profile": "preserved"}}
+        with patch("tools.natsql_pilot.natsql_adapter.convert", side_effect=converted):
+            report = study.run(self.output, provider=self.answer, ledger=self.ledger,
+                converter_options={"upstream": self.root, "network_profile": "enlarged-indexed",
+                                   "literal_profile": "preserved"})
+        self.assertTrue(report["completed"])
+        self.assertTrue(all(options["schema_cache"] == expected_cache and
+                            options["literal_profile"] == "preserved" for options in seen))
+        (self.output / "converter-cache/schema.json").write_text("changed")
+        with self.assertRaisesRegex(ValueError, "Frozen input changed"):
+            study.verify(self.output)
+
     def test_public_request_allowlists_tasks_and_nested_schema(self):
         schema = {"version": 1, "database_id": "fixture", "private": "PRIVATE_GOLD_SENTINEL",
                   "tables": [{"name": "t", "private": "PRIVATE_GOLD_SENTINEL", "columns": [

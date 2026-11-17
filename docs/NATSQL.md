@@ -6,6 +6,69 @@ environment. A separate first-attempt model condition is now implemented in
 [NatSQL guide](../prompts/natsql.md). It receives the same public catalog facts
 as SQL and SQLP, then converts and scores every generated query.
 
+## Larger matched follow-up (November 17)
+
+The expanded study now includes **188 fixed NatSQL targets per model** for
+Luna, Sol, and Astra, with exact SQL/SQLP counterparts from the larger stress
+study. All three models receive identical public questions, complete catalog
+facts, grouping, high reasoning, and output caps. These are 47 complete batches
+per model, not 564 independent questions. Selection uses structural plans and
+catalogs, without consulting model outcomes.
+
+NatSQL matches 171/188 for Luna, 184/188 for Sol, and 183/188 for Astra. Four
+reference encodings already return no SQL in the pinned backend. On the
+**184 reference-compatible cases**, SQL and SQLP match every answer in all three
+models, while NatSQL matches 171, 184, and 183. The remaining misses involve
+implicit wrong-join inference or explicit encoding mistakes. The same match
+counts hold on the alternate snapshots. These results compare model-plus-guide
+and compiler interfaces, not syntax alone.
+
+The original driver times out during join-network expansion on these larger
+catalogs, even for a direct-column query. The follow-up explicitly opts into:
+
+- `network_profile="enlarged-indexed"`: the verified upstream enlargement
+  algorithm runs through an adapter wrapper that indexes its duplicate check.
+  Ordered network lists match the original on academic, Chinook, and seeded
+  graph controls. The full commerce graph builds 52,899 networks in about nine
+  seconds; no table/column/key facts or alternative join networks are removed.
+- A prepared-schema cache keyed by the complete original schema, upstream
+  blobs, adapter, cache codec, and indexing implementation. Hashes, input facts,
+  sizes, and paths are validated before conversion. Each worker loads a fresh
+  typed-JSON copy, preserving integer dictionary keys and preventing mutation
+  between queries. Preparation is independent of questions, gold, and rows.
+- `literal_profile="preserved"`: valid single-quoted string tokens pass through
+  the upstream tokenizer as opaque markers, then return as correctly escaped
+  SQL literals with identical values. This fixes apostrophe corruption without
+  guessing values or repairing malformed syntax. Identifiers, comments, numbers,
+  and blobs are not rewritten. Source and implementation hashes are retained.
+
+Default `enlarged`/`native` behavior and the earlier frozen studies remain
+unchanged. Diagnostic `base` omits enlargement and loses join alternatives; it
+is **not used for the model comparison**. The indexed follow-up is a declared
+adapter profile, not an unchanged reproduction of the original preprocessing
+driver or trained NatSQL model.
+
+Faithful enlargement still prunes networks above five tables. Four particular
+reference encodings fail in this profile; their failures remain visible. This
+does not prove that no alternative encoding can answer them. Reference
+preparation retains all 376 primary/contrast checks; one parallel execution
+timeout has a separate serial check of the identical SQL in 0.002 seconds.
+Coverage was frozen before the new model calls. A 176-question, whole-batch
+supplement permits comparisons without the four reference failures.
+
+One original NatSQL send each for Luna and Sol lost its response. Explicit
+identical-payload recoveries are recorded separately, with the original unknown
+usage and spending reservations preserved. Therefore their whole-API token
+totals remain unknown; retained-response subtotals are not complete workflow
+totals. Astra's NatSQL usage is fully known. See
+[the results, mixed token findings, and current status](STUDY_RESULTS.md).
+
+Implementation: [indexed network wrapper](../tools/natsql_network.py),
+[typed cache](../tools/natsql_cache.py), [literal transport](../tools/natsql_literals.py),
+and [matched control tools](../tools/natsql_scale_controls.py). Frozen evidence,
+actual model responses, alternate-data rescoring, and failure reviews are under
+`resources/experiments/scale-study-2026-11-16/multi-model/`.
+
 ## Correction to the first comparison
 
 The first guide incorrectly restricted NatSQL to equality predicates and omitted
@@ -96,8 +159,10 @@ annotations, so scores against the original SQL are not a standalone version ran
 [NatSQL V1.6.1, commit dcd716f](https://github.com/ygan/NatSQL/tree/dcd716fc9b920419cf838e490aad4a6f3b4fd231).
 It verifies the exact Git blob hashes of all 13 imported upstream files and copies
 only those files into a private directory before importing them. It never
-downloads code, installs packages, calls a model, rewrites a query, or executes
-the resulting SQL. Returned SQL still needs the shared read-only scorer.
+downloads code, installs packages, calls a model, or executes the resulting SQL.
+Default conversion passes the original query text; the explicitly selected
+literal-transport profile above preserves valid literal values through native
+tokenization. Returned SQL still needs the shared read-only scorer.
 
 The adapter exports our reviewed catalog, then calls the unmodified upstream
 structural schema functions to create per-table stars, column indices, networks,

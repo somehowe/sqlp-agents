@@ -146,6 +146,16 @@ NatSQL preprocessing pipeline.
 
 ## Evaluation
 
+The November 17 follow-up completes the **1,000-question SQL/SQLP comparison on
+Luna, Sol, and Astra**, plus **188 matched NatSQL targets per model**. SQLP matches
+990/1,000 for Luna and 1,000/1,000 for Sol/Astra; SQL matches 946, 999, and 1,000.
+On 184 reference-compatible shared cases, NatSQL matches 171, 184, and 183.
+The declared NatSQL adapter profile preserves full join networks and literal
+values; its four reference reconstruction limits remain explicit. The wider
+public SQL challenge is complete for Luna/Sol and partial for Astra. Transport
+recoveries and unknown usage are reported separately. See
+[the current results and limitations](docs/STUDY_RESULTS.md).
+
 The November 16 expansion ran **2,034 distinct questions** and retained all
 3,034 generated outputs. On 1,000 matched supported stress cases, Luna matched
 946 SQL and 990 SQLP answers; SQLP used 10.70% fewer total tokens in this batch
@@ -180,7 +190,7 @@ make -j2 all test
 make test-viewer
 ```
 
-The first command builds both executables and runs the C++ suites, 413 Python
+The first command builds both executables and runs the C++ suites, 502 Python
 tests, and 1,200 differential compiler cases. Optional integrations skip when
 their separate inputs are absent. The second runs 61 Node checks across the
 saved viewer and interactive lab, without packages. A Chromium walkthrough

@@ -91,6 +91,10 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/natsql_batch_pilot_test.py
 	python3 tests/scale_runner_test.py
 	python3 tests/scale_validation_test.py
+	python3 tests/scale_model_matrix_test.py
+	python3 tests/scale_accounting_test.py
+	python3 tests/recover_scale_transport_test.py
+	python3 tests/natsql_scale_controls_test.py
 	python3 tests/analysis_test.py
 	python3 tests/snapshot_evaluation_test.py
 	python3 tests/demo_test.py
@@ -101,6 +105,9 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/review_packet_test.py
 	python3 tests/benchmark_test.py
 	python3 tests/natsql_test.py
+	python3 tests/natsql_network_test.py
+	python3 tests/natsql_cache_test.py
+	python3 tests/natsql_literals_test.py
 	python3 tests/differential_test.py
 
 test-viewer:
