@@ -77,6 +77,9 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/arm_mapping_test.py
 	python3 tests/chinook_test.py
 	python3 tests/path_study_test.py
+	python3 tests/scale_study_test.py
+	python3 tests/natsql_scale_subset_test.py
+	python3 tests/public_textsql_benchmark_test.py
 	python3 tests/join_views_test.py
 	python3 tests/comparison_test.py
 	python3 tests/model_provider_test.py
@@ -85,6 +88,9 @@ test: build/path_test build/mapping_test build/sql_test build/query_test build/l
 	python3 tests/pilot_test.py
 	python3 tests/batch_pilot_test.py
 	python3 tests/natsql_pilot_test.py
+	python3 tests/natsql_batch_pilot_test.py
+	python3 tests/scale_runner_test.py
+	python3 tests/scale_validation_test.py
 	python3 tests/analysis_test.py
 	python3 tests/snapshot_evaluation_test.py
 	python3 tests/demo_test.py

@@ -1,10 +1,156 @@
 # Exploratory study results
 
-Updated November 6, 2026. Three models from one provider answer twelve Chinook
-development questions and 32 related constructed templates. The templates are
-eight families at depths 1, 2, 4, and 6. Repetitions, depth/catalog variants, and alternate
-snapshots are correlated observations. Human interpretation review is pending;
-the thirty reserved questions remain unrun.
+Updated November 16, 2026. The new scale evaluation runs 2,034 distinct English
+questions with Luna; the earlier three-model studies below retain their original
+twelve Chinook development questions and 32 related constructed templates.
+Questions, shared templates, repeated outputs, and snapshots are counted
+separately. Human interpretation review remains pending; the thirty reserved
+Chinook questions remain unrun.
+
+## Expanded evaluation: 2,034 questions (November 16)
+
+A fresh **768-call** run generates **3,034 query outputs** for **2,034 distinct
+English questions** across 24 primary databases with 599,764 rows. It uses
+`gpt-6-luna`, high reasoning, one stateless attempt, batches of four, and a
+16,384-output-token cap. There are no repairs or model retries. Exact public
+requests, V2 SQL/SQLP guides, data, compiler, private answer plans, Python runtime,
+raw responses, journals, reports, and accounting are frozen or retained under
+`resources/experiments/scale-study-2026-11-16/study/`.
+
+The **matched comparison** uses 1,000 new supported questions over four larger
+synthetic graphs. Both languages receive the same questions and relationship
+facts, with corresponding guides. Results are:
+
+| Condition | Reference answer matches | Total reported input + output tokens |
+| --- | ---: | ---: |
+| SQL | 946/1,000 (94.6%) | 946,742 |
+| SQLP | 990/1,000 (99.0%) | 845,484 |
+
+SQLP uses **10.70% fewer total tokens** in this protocol, including guides,
+schema, failures, and reported reasoning. Input/output totals are respectively
+725,621/221,121 for SQL and 733,181/112,303 for SQLP. Guide overhead is included;
+this does not isolate syntax. Of the 1,000 pairs, 939 match in both conditions,
+51 match only in SQLP, seven only in SQL, and three in neither.
+
+The harder paths reveal errors that the original small workload rarely did:
+
+| Maximum path depth | Questions | SQL matches | SQLP matches |
+| --- | ---: | ---: | ---: |
+| 1 | 200 | 200 | 199 |
+| 2 | 160 | 159 | 160 |
+| 3 | 160 | 158 | 158 |
+| 4 | 160 | 150 | 158 |
+| 6 | 160 | 142 | 159 |
+| 8 | 160 | 137 | 156 |
+
+SQL has eight SQLite errors, one row-limit failure, and 45 executed wrong
+answers. SQLP has ten executed wrong answers. Reviewed examples include
+undefined SQL aliases, omitted filters, extra relationship hops, and wrong
+terminal fields. Every SQLP mismatch has an explicit path, field, or literal
+difference from its authored answer plan. Queries with several branches need
+up to 24 distinct joins.
+
+These are controlled stress cases, with 955 literal-normalized templates and
+602 structures after abstracting table and role names. Four different graph
+topologies share one synthetic data generator and generic field distributions.
+The deliberately long possessive English chains are artificial; this is not a
+production-language generalization claim. All 100 labelled empty controls
+match in both languages. Excluding them gives SQL **846/900** and SQLP
+**890/900**. Reference queries and independent Python traversal share authored
+interpretations and still need independent human review. Depth changes question
+length and graph structure, so the depth table is descriptive.
+
+The **separate public SQL challenge** uses all 1,034 published Spider dev
+questions over 20 databases. It includes aggregates, grouping, nested queries,
+and set operators. SQL matches **828/1,032 executable reference answers (80.2%)**;
+two published reference queries encounter invalid UTF-8 and remain unscorable.
+There are 200 executed mismatches and four generated-query text-decoding errors.
+All 1,034 attempts remain in usage totals: **597,446 tokens**.
+
+This is a duplicate-sensitive, single-snapshot reference-execution metric with
+column-order checks, outer ORDER BY handling, and documented numeric tolerance;
+it is **not official Spider leaderboard or test-suite accuracy**. Some mismatches
+are real query mistakes; others reflect ambiguous reference semantics, output
+column order, zero-count inclusion, tied LIMIT results, or case-sensitive value
+grounding without cell samples. They are not all established reasoning errors.
+Of the 204 scored mismatches, 40 match after only permuting projected columns;
+that supplementary diagnostic does not replace the frozen primary scores.
+The 1,034 questions contain 564 distinct database/gold-query pairs and can occur
+in model training data. Static analysis places 849 questions outside SQLP's
+current fragment; 185 syntactic candidates remain unverified. No public SQLP
+accuracy or cross-language ranking is reported for this challenge. See
+[the workload and scoring details](WORKLOAD.md).
+
+Before model generation, all **4,000 prepared SQL/SQLP executions** match Python
+traversal on primary and alternate synthetic snapshots. Alternate data changes
+836 expected answer bags. Saved generated queries retain 946 SQL and 990 SQLP
+matches on the alternate data; no primary match becomes a mismatch there.
+Passing these snapshots remains diagnostic rather than an equivalence proof.
+
+An outcome-independent structural filter also preserves 188 questions in 47
+complete original batches for a possible NatSQL follow-up. No NatSQL model
+requests were sent: all eight converter preflight checks time out on the full
+catalogs. A serial trace isolates the bottleneck to the pinned official
+`enlarge_network` function, which exceeds 90 seconds after earlier setup takes
+0.307 seconds. This exceeds the adapter's 60-second maximum before query parsing.
+Eligibility, verified-source diagnostics, and setup status are retained beside
+the main study. This is a converter setup limit, not NatSQL model accuracy;
+no relationship facts were pruned to force a comparison.
+
+All **768 responses report known usage**, totalling **2,389,672 tokens**.
+Final validation checks exact frozen hashes, public-only prompts, all task
+coverage, raw response/report/ledger bindings, and token totals. It re-executes
+all 3,032 scoreable outputs and 2,000 supported outputs on alternate data;
+`validation.json`, `failure-review.json`, and `public-failure-review.json`
+retain the evidence. A post-freeze validator correction uses the declared public
+row limit for public re-execution; both validator hashes are recorded. No main
+requests, queries, scores, or frozen files changed.
+The new estimated API charge is **$0.464549**, using the existing rate table;
+this is not an invoice. The shared cumulative ledger remains below its original
+$100 ceiling (conservative total $91.012978 including prior reserves).
+Results and failure reviews stay separate from the historical studies below.
+These single-model, constructed and public-dev observations broaden coverage;
+they do not establish independent human gold, contamination-free accuracy,
+cross-provider generalization, or a universal language advantage.
+
+## Fresh three-language batching follow-up (November 13)
+
+A fresh **432-call** experiment measures SQL, SQLP, and NatSQL at JSON batch sizes
+1, 4, and 12. It reruns all three languages with the same twelve development
+questions, three models, and three repetitions: **972 scored query outputs**,
+not 972 independent questions. Corrected V2 SQL/SQLP guides and the generic V3
+NatSQL clarification are frozen across batch sizes. Public facts, task groups,
+JSON output contract, high reasoning, 8,192-output-token request cap, and
+five-second SQLite execution limit are matched. There are no repairs.
+
+Across all batch conditions, answer matches are **SQL 322/324, SQLP 324/324,
+NatSQL 317/324**. Sol and Astra match every answer in all three languages.
+Luna's seven NatSQL failures comprise three conversion rejections, three wrong
+answers, and one execution timeout; its two SQL failures are a row-limit failure
+and an undefined alias. All failures remain in usage totals.
+
+At batch size 12:
+
+| Model | SQLP token change vs SQL | NatSQL token change vs SQL | SQLP fewer tokens than NatSQL |
+| --- | ---: | ---: | ---: |
+| Sol | -9.39% | +2.75% | 11.82% |
+| Luna | -9.34% | +65.16% | 45.11% |
+| Astra | -10.37% | +4.62% | 14.33% |
+
+These are pooled input-plus-output totals, including guides and reported reasoning.
+Luna's largest difference is mainly reported reasoning tokens, rather than visible
+query length. Guide lengths differ; this compares complete interfaces and does not
+isolate syntax. Larger batches share a fixed output budget. Human interpretation
+review remains pending; reserved questions remain unrun. The earlier experiments
+below retain their own guides, records, and scores.
+
+The estimated new API charge is **$3.72439**. Frozen plans, raw responses, journals,
+reports, and independent validation are under
+`resources/experiments/three-language-batches-2026-11-13/`. All 27 reports,
+432 calls, 972 outputs, hashes, row bags, and chart percentages passed validation.
+The presentation token slide uses this fresh experiment, with separate model
+panels and a SQL zero baseline; the earlier single-query correctness table remains
+separately labeled.
 
 ## Corrected SQL / SQLP / NatSQL comparison
 
@@ -97,7 +243,7 @@ percentages. See [the reproduction scope](NATSQL.md).
 
 ## Accounting and interpretation
 
-The historical archive now contains **2,628 experimental API calls**, **2,988
+The November 6 archive contains **2,628 experimental API calls**, **2,988
 generated/scored outputs**, and 108 reports, including the 108 superseded NatSQL
 calibration calls. Offline gold reconstructions, alternate-data executions, and
 manual browser edits add no model calls. The 432 newer calls comprise the 324-call

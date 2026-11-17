@@ -1,6 +1,6 @@
 # Agent context — SQLP for AI Agents
 
-Updated November 6, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
+Updated November 16, 2026. Read this for project context before working on the repository. It lives under `docs/`; agents working elsewhere may need to be explicitly directed to read it.
 
 ## Current direction and context
 
@@ -36,7 +36,33 @@ The Python runner orchestrates execution; the local viewer consumes its saved re
 
 ## Actual code at this update
 
-The current checks cover the C++ suites, 360 Python tests, 1,200 differential
+The November 16 scale expansion adds 1,000 distinct constructed SQL/SQLP tasks
+over four larger synthetic relationship graphs and all 1,034 public Spider dev
+questions as a separate SQL challenge. Primary data totals 599,764 rows across
+24 databases. The supported cases reach eight relationship hops and 24 joins;
+955 literal-normalized templates correspond to 602 abstract structures. They
+share one generator and authored interpretations, with 100 deliberate empty
+controls. Do not call these independent human-reviewed production tasks. All
+4,000 prepared executions match separate Python traversal on primary/contrast
+snapshots; prepared checks are distinct from model results. Public questions
+include paraphrases (564 distinct database/gold-query pairs); 1,032 reference
+queries execute and two invalid-text cases remain unscorable. See
+[WORKLOAD.md](WORKLOAD.md) and [STUDY_RESULTS.md](STUDY_RESULTS.md).
+
+New tools: `prepare_scale_study.py`, `public_textsql_benchmark.py`,
+`run_scale_study.py`, and `validate_scale_study.py`. The study freezes requests,
+data, compiler, guides, and Python runtime, retains every raw response before
+scoring, resumes using exact ledger bindings, and counts usage once per batch.
+The main protocol uses Luna/high reasoning, matched batches of four, and a
+16,384-output-token cap. Main artifacts are under
+`resources/experiments/scale-study-2026-11-16/study/`; preserve frozen originals
+and the existing cumulative $100 ledger. `prepare_natsql_scale_subset.py`
+selects 188 structurally eligible questions from 47 complete original batches
+without reading model outcomes. A NatSQL follow-up must pass converter preflight
+before paid calls; the pinned converter currently stalls in full-catalog join
+network expansion. This setup limit is not a generated-query accuracy result.
+
+The current checks cover the C++ suites, 413 Python tests, 1,200 differential
 queries, and 61 Node checks (23 saved-viewer plus 38 Path Studio checks). Optional
 integrations skip when their separate inputs are unavailable; fresh checkouts
 can have more skips than Ryan's configured environment. A real Chromium

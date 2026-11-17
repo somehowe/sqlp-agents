@@ -1,4 +1,99 @@
-# Chinook case study
+# Evaluation workloads
+
+## Expanded scale study (November 16, 2026)
+
+The expanded evaluation contains **2,034 distinct English questions**. The
+matched SQL/SQLP stress workload has 1,000 questions over four fictional
+relationship graphs: commerce, clinical encounters, logistics, and research.
+Their primary snapshots contain 59,904 rows, 35 tables, and 66 relationships.
+Each has an alternate snapshot of the same size. Every prepared SQL and compiled
+SQLP answer matches a separate Python record traversal on both snapshots:
+4,000 prepared executions. These checks validate the reference implementation;
+generated model results are reported separately in [STUDY_RESULTS.md](STUDY_RESULTS.md).
+
+Ten question families cover projections, competing roles, shared prefixes,
+multiple filters, duplicate bags, distinct tuples, three branches, role-specific
+filters, empty controls, and integer filters. Paths have one, two, three, four,
+six, or eight relationships; the largest query needs 24 distinct joins. The
+1,000 questions contain 955 templates after removing literal values and 602
+structures after also abstracting table/role names. One hundred cases are
+deliberately empty controls. Answers change on alternate data for 836 cases.
+The four graphs have different topologies but share a synthetic record generator
+and generic attribute distributions. They are correlated controlled stress
+cases, with pending human interpretation review.
+
+The separate public SQL challenge retains all **1,034 Spider development
+questions** across 20 databases, 80 tables, and 539,860 rows. There are 564
+distinct database/gold-query pairs: different questions sometimes paraphrase
+the same query. This is the published development split, and possible model
+training exposure is unknown. It includes 551 queries with aggregates, 277 with
+GROUP BY, 81 with subqueries, and UNION/INTERSECT/EXCEPT cases. Its published
+reference SQL executes on 1,032 questions; two WTA reference queries encounter
+invalid UTF-8 and remain explicitly unscorable. Original database bytes and
+published reference queries are preserved.
+
+This challenge measures SQL generation separately. Static analysis identifies
+849 questions outside the current SQLP fragment and 185 unverified syntactic
+candidates. Candidates still need relationship-totality, type, and translation
+review; none is presented as an evaluated SQLP translation. NatSQL's current
+alias-free profile also cannot represent every repeated-table role in the
+stress workload, so the expanded matched comparison uses SQL and SQLP.
+The outcome-independent NatSQL subset exporter preserves 188 questions from
+47 complete original batches without repeated physical-table bindings. Its
+eight offline converter preflights time out on the full catalogs; a serial trace
+locates the bottleneck in official join-network expansion beyond 90 seconds.
+No new NatSQL model calls or accuracy denominator are reported.
+
+Public scoring compares requested columns and duplicate counts, respects an
+outer ORDER BY, and uses numeric relative tolerance 1e-6 and absolute tolerance
+1e-8. Ordering within tied values can still reject equivalent alternatives.
+These are single-snapshot execution matches, **not official Spider leaderboard
+or test-suite accuracy**. Passing one database does not establish semantic
+equivalence. See the [Spider source](https://yale-lily.github.io/spider) and
+[evaluation guidance](https://github.com/taoyds/spider/blob/master/evaluation_examples/README.md).
+
+Prepare the inputs and a frozen request plan without model calls:
+
+```bash
+make
+python3 -m tools.prepare_scale_study build/scale-supported
+python3 -m tools.public_textsql_benchmark build/scale-public
+python3 -m tools.run_scale_study prepare build/scale-study \
+  --supported build/scale-supported --public build/scale-public \
+  --languages sql sqlp --model gpt-6-luna --batch-size 4 \
+  --max-output-tokens 16384 --reasoning-effort high
+python3 -m tools.run_scale_study verify build/scale-study
+```
+
+The public builder needs the existing pinned local Spider source under
+`resources/icde-audit/natsql-reproduction-independent/`, or `--source-root` with
+the same original JSON, extraction manifest, and databases. It makes no downloads
+or dependency installations. Synthetic preparation needs only the compiler and
+Python standard library. Both builders refuse existing destinations.
+
+Live execution is explicit and uses the existing cumulative spending ledger:
+
+```bash
+python3 -m tools.run_scale_study run build/scale-study \
+  --api-key-file resources/private/openai_api_key --workers 8
+python3 -m tools.validate_scale_study build/scale-study --require-complete \
+  --ledger resources/experiments/demo-study-2026-11-06/spending \
+  --output build/scale-study/validation.json
+```
+
+The November 16 run executes the copied `study/runtime/tools` implementation,
+with absolute study, credential, and ledger paths. It freezes corresponding V2
+guides from the November 13 archive, model settings, public requests, private
+answers, data, compiler, and Python sources. Public prompts contain questions
+and schema facts only. One attempt is made per language/question, with four
+questions sharing each request and the same 16,384-output-token cap. There are
+768 requests and 3,034 planned outputs. Raw responses are retained before
+scoring; resume reuses them and refuses uncertain duplicate sends. Usage belongs
+to whole batches and includes failures. The saved-query validator checks
+coverage, request/response bindings, usage, hashes, primary execution, and
+alternate snapshots without additional model calls.
+
+## Chinook case study
 
 This is a bounded, project-authored comparison workload: **12 development and
 30 reserved questions** over a pinned Chinook database snapshot. Each question

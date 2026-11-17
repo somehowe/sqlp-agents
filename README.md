@@ -130,6 +130,14 @@ with two catalog widths and three valid snapshots. These are controlled cases,
 not independent databases. See [the workload](docs/WORKLOAD.md) and
 [controlled path study](examples/path_study/README.md).
 
+The [expanded workload](docs/WORKLOAD.md) adds **1,000 distinct SQL/SQLP stress
+questions** over four larger synthetic graphs, with paths up to eight hops and
+24 joins, plus **1,034 public Spider questions** across 20 databases for a separate
+SQL challenge. The primary data contains 599,764 rows in total. Alternate
+synthetic snapshots expose accidental answer matches. Distinct questions,
+shared templates, prepared checks, and model outputs are counted separately;
+unsupported SQLP features are reported as coverage limits.
+
 Data-lake discovery remains a possible extension. The current system receives
 approved relationships; it does not discover connections automatically. The
 optional [NatSQL condition](docs/NATSQL.md) now has actual recorded model results.
@@ -137,6 +145,14 @@ It uses a documented structural schema adapter rather than the full published
 NatSQL preprocessing pipeline.
 
 ## Evaluation
+
+The November 16 expansion ran **2,034 distinct questions** and retained all
+3,034 generated outputs. On 1,000 matched supported stress cases, Luna matched
+946 SQL and 990 SQLP answers; SQLP used 10.70% fewer total tokens in this batch
+protocol. The separate public SQL challenge matched 828/1,032 executable Spider
+references, with two unscorable gold cases. These single-model results include
+correlated synthetic templates and public-dev reference ambiguities. See
+[the complete results and limitations](docs/STUDY_RESULTS.md).
 
 Each comparison uses the same model/settings, questions, data, and
 relationship facts, with a corresponding guide for each language. The current
@@ -164,7 +180,7 @@ make -j2 all test
 make test-viewer
 ```
 
-The first command builds both executables and runs the C++ suites, 360 Python
+The first command builds both executables and runs the C++ suites, 413 Python
 tests, and 1,200 differential compiler cases. Optional integrations skip when
 their separate inputs are absent. The second runs 61 Node checks across the
 saved viewer and interactive lab, without packages. A Chromium walkthrough
